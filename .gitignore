@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# IDE & Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Agent / AI generated
+.agent/
+.agents/
+.gemini/
+
+# OS generated
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Obsidian (personal notes)
+.obsidian/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Scratch / temporary files
+scratch/primary_sheet_dump.json
+
+# Notes (personal — not project docs)
+notes/
+goal.md
+task.md
+ORIGINAL_REQUEST.md
+
+# Unused copy of @ alias folder
+@/
+

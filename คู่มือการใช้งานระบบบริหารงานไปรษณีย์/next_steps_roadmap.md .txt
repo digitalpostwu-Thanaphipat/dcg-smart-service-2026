@@ -1,0 +1,25 @@
+ 📄 next_steps_roadmap.md                                                                                                   
+  ──────
+  ### 🗺️ สรุปแผนงานและส่วนที่ต้องดำเนินการต่อไป:
+
+  #### 1. การเปลี่ยนผ่านสู่ระบบจริง (Production API Integration)
+
+  • การเชื่อมต่อ: ปรับแต่งไฟล์  src/config.ts  เพื่อเปลี่ยนค่า  API_URL  จากโหมดทดสอบไปชี้ที่ Google Apps Script Web App โปรดักชันจริง
+  • การจัดการเครือข่าย: เพิ่มระบบดักจับข้อผิดพลาด (Error Handling) และการป้องกันปัญหา Rate Limits จากการเรียกใช้ API ของฝั่ง Google Sheets
+
+  #### 2. พัฒนาระบบ Tracking Links (External Redirection)
+
+  • การลิงก์ขนส่งภายนอก: ปรับปรุงหน้าตรวจสอบสาธารณะ ( PublicTrackView.tsx ) ให้วิเคราะห์ฟิลด์หมายเลข  tracking
+  และแสดงปุ่มกดนำทางไปยังเว็บขนส่งจริงอัตโนมัติ (เช่น ไปรษณีย์ไทย, Kerry, Flash, J&T)
+  • ตัวอย่าง URL: ไปรษณีย์ไทย ->  https://track.thailandpost.co.th/?trackNumber={TRACKING_NO}
+
+  #### 3. เสริมความสามารถ PWA และระบบ Offline (GGSheet Protocol)
+
+  • ** standalone mode**: ปรับค่า  manifest.json  เพื่อรองรับการเปิดแบบแอปพลิเคชันเดี่ยว
+  • การซิงก์ข้อมูลออฟไลน์: พัฒนาระบบ Optimistic UI Updates เมื่ออินเทอร์เน็ตหลุด โดยจัดเก็บข้อมูลลงใน IndexedDB ( syncEngine.ts )
+  และทำกระบวนการส่งประวัติตกค้างขึ้น Google Sheets ทันทีที่เชื่อมต่อสำเร็จผ่านเหตุการณ์  online
+
+  #### 4. ขยายขอบเขตการเขียน E2E Test ด้วย Playwright
+
+  • ขยายการทดสอบ: ปรับปรุงสคริปต์ playwright-test-sanity.js ให้ครอบคลุมระบบล็อกอินและระบบบันทึกงานของเจ้าหน้าที่หลัก (Staff View)
+  • CI/CD Integration: ตั้งค่า workflow บน GitHub Actions ให้รัน Playwright เสมอเมื่อมีการแก้ไขโค้ด
