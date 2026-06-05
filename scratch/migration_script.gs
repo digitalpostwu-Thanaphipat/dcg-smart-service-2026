@@ -9,7 +9,7 @@
  * 4. เลือกฟังก์ชัน runDataMigration และกดคลิก Run (เรียกใช้งาน)
  */
 
-var OLD_SPREADSHEET_ID = "YOUR_OLD_SPREADSHEET_ID_HERE"; // แก้ไขตรงนี้ด้วย ID ของสเปรดชีตระบบเก่า!
+var OLD_SPREADSHEET_ID = "1tGLmk96A2XJDU2AycbR52Seehl5rB2jQiPc9LvsNSEI"; // ID ของสเปรดชีตระบบเก่าที่กำลังใช้งานจริง
 
 function runDataMigration() {
   var ssNew = SpreadsheetApp.getActiveSpreadsheet();
