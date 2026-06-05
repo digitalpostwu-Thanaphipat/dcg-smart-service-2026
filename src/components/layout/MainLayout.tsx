@@ -292,137 +292,140 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         </div>
       </aside>
 
-      {/* MOBILE HEADER - Only on Mobile/Tablet (md:hidden) */}
-      <header className="md:hidden sticky top-0 z-40 backdrop-blur-md bg-white/70 dark:bg-slate-900/60 border-b border-slate-200/60 dark:border-white/5 transition-colors duration-300">
-        <div className="max-w-xl mx-auto px-4 py-3 flex justify-between items-center">
-          <div className="flex items-center gap-2.5">
-            <div className={cn("p-1.5 rounded-lg text-white shadow-md", themeConfig.bg)}>
-              {themeConfig.icon}
-            </div>
-            <div>
-              <h1 className="text-xs font-black text-slate-800 dark:text-white">
-                {sysConfig.appName || 'DCG Smart Service'}
-              </h1>
-              <p className="text-[8px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-tighter">
-                {sysConfig.appSubtitle || 'ส่วนอำนวยการสารบรรณ'}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            {/* Connection & Sync Status Indicator (Mobile) */}
-            <div className={cn(
-              "flex items-center gap-1.5 px-2 py-1 rounded-lg border text-[8px] font-bold transition-all shadow-sm",
-              isOnline 
-                ? syncQueueCount > 0 
-                  ? "bg-purple-500/10 border-purple-500/20 text-purple-600 dark:text-purple-400" 
-                  : "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400"
-                : "bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400 animate-pulse"
-            )}>
-              <span className={cn(
-                "w-1.5 h-1.5 rounded-full inline-block",
-                isOnline 
-                  ? syncQueueCount > 0 ? "bg-purple-500 animate-pulse" : "bg-emerald-500" 
-                  : "bg-amber-500"
-              )} />
-              <span className="hidden sm:inline">
-                {isOnline 
-                  ? syncQueueCount > 0 ? `ซิงค์ (${syncQueueCount})` : "ออนไลน์" 
-                  : `ออฟไลน์ (${syncQueueCount})`}
-              </span>
-              {syncQueueCount > 0 && <span className="sm:hidden">{syncQueueCount}</span>}
-            </div>
-
-            <button 
-              onClick={toggleTheme}
-              className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/50 border border-slate-200/60 dark:border-white/5 text-slate-600 dark:text-slate-200 rounded-xl transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-purple-500 dark:focus-visible:ring-orange-500 focus-visible:outline-none"
-              aria-label="สลับธีม"
-            >
-              {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
-            </button>
-
-            <button 
-              onClick={handleLogout}
-              className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/50 dark:hover:bg-slate-700/50 text-slate-700 hover:text-rose-600 dark:text-slate-300 dark:hover:text-rose-400 border border-slate-200/60 dark:border-white/5 rounded-xl transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-purple-500 dark:focus-visible:ring-orange-500 focus-visible:outline-none"
-              aria-label="ออกจากระบบ"
-            >
-              <LogOut size={14} />
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Dynamic Announcements */}
-      <AnimatePresence>
-        {showAnnouncement && sysConfig.show && (
-          <motion.div 
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="bg-amber-500/10 border-b border-amber-500/20 overflow-hidden relative z-20 w-full"
-          >
-            <div className="max-w-xl mx-auto px-4 py-2.5 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <Bell size={13} className="text-amber-600 dark:text-amber-500 flex-shrink-0" />
-                <p className="text-[10px] font-bold text-amber-800 dark:text-amber-200/80 leading-normal">
-                  {sysConfig.announcement}
+      {/* Right Column Container */}
+      <div className="flex-1 flex flex-col min-w-0 relative">
+        {/* MOBILE HEADER - Only on Mobile/Tablet (md:hidden) */}
+        <header className="md:hidden sticky top-0 z-40 backdrop-blur-md bg-white/70 dark:bg-slate-900/60 border-b border-slate-200/60 dark:border-white/5 transition-colors duration-300">
+          <div className="max-w-xl mx-auto px-4 py-3 flex justify-between items-center">
+            <div className="flex items-center gap-2.5">
+              <div className={cn("p-1.5 rounded-lg text-white shadow-md", themeConfig.bg)}>
+                {themeConfig.icon}
+              </div>
+              <div>
+                <h1 className="text-xs font-black text-slate-800 dark:text-white">
+                  {sysConfig.appName || 'DCG Smart Service'}
+                </h1>
+                <p className="text-[8px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-tighter">
+                  {sysConfig.appSubtitle || 'ส่วนอำนวยการสารบรรณ'}
                 </p>
               </div>
-              <button onClick={() => setShowAnnouncement(false)} className="text-amber-600/50 hover:text-amber-600 dark:text-amber-500/50 dark:hover:text-amber-500 transition-colors">
-                <X size={13} />
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              {/* Connection & Sync Status Indicator (Mobile) */}
+              <div className={cn(
+                "flex items-center gap-1.5 px-2 py-1 rounded-lg border text-[8px] font-bold transition-all shadow-sm",
+                isOnline 
+                  ? syncQueueCount > 0 
+                    ? "bg-purple-500/10 border-purple-500/20 text-purple-600 dark:text-purple-400" 
+                    : "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                  : "bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400 animate-pulse"
+              )}>
+                <span className={cn(
+                  "w-1.5 h-1.5 rounded-full inline-block",
+                  isOnline 
+                    ? syncQueueCount > 0 ? "bg-purple-500 animate-pulse" : "bg-emerald-500" 
+                    : "bg-amber-500"
+                )} />
+                <span className="hidden sm:inline">
+                  {isOnline 
+                    ? syncQueueCount > 0 ? `ซิงค์ (${syncQueueCount})` : "ออนไลน์" 
+                    : `ออฟไลน์ (${syncQueueCount})`}
+                </span>
+                {syncQueueCount > 0 && <span className="sm:hidden">{syncQueueCount}</span>}
+              </div>
+
+              <button 
+                onClick={toggleTheme}
+                className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/50 border border-slate-200/60 dark:border-white/5 text-slate-600 dark:text-slate-200 rounded-xl transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-purple-500 dark:focus-visible:ring-orange-500 focus-visible:outline-none"
+                aria-label="สลับธีม"
+              >
+                {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+              </button>
+
+              <button 
+                onClick={handleLogout}
+                className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/50 dark:hover:bg-slate-700/50 text-slate-700 hover:text-rose-600 dark:text-slate-300 dark:hover:text-rose-400 border border-slate-200/60 dark:border-white/5 rounded-xl transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-purple-500 dark:focus-visible:ring-orange-500 focus-visible:outline-none"
+                aria-label="ออกจากระบบ"
+              >
+                <LogOut size={14} />
               </button>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Sync Status Toast Notification */}
-      <AnimatePresence>
-        {status && (
-          <motion.div 
-            initial={{ y: -20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -20, opacity: 0 }}
-            className="fixed top-20 left-0 right-0 z-50 px-4 pointer-events-none"
-          >
-            <div 
-              role="status" 
-              aria-live="polite"
-              className={cn(
-                "max-w-xs mx-auto p-3.5 rounded-2xl border shadow-2xl flex items-center gap-3.5 backdrop-blur-xl",
-                status.type === 'success' ? "bg-emerald-500/20 border-emerald-500/30 text-emerald-800 dark:text-emerald-200" : "bg-rose-500/20 border-rose-500/30 text-rose-800 dark:text-rose-200"
-              )}
-            >
-              <div className={cn("p-1 rounded-full text-white", status.type === 'success' ? "bg-emerald-500" : "bg-rose-500")}>
-                <CheckCircle2 size={12} className="text-white" />
-              </div>
-              <p className="text-[11px] font-extrabold tracking-tight">{status.text}</p>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* MAIN VIEWPORT PANEL */}
-      <main className="flex-1 overflow-x-hidden z-10">
-        <div className="w-full max-w-5xl mx-auto px-4 py-6 md:py-10 pb-32 md:pb-12">
-          
-          {/* Header Title inside Content (Desktop only) */}
-          <div className="hidden md:flex items-center gap-3.5 mb-8">
-            <div className={cn("w-1 h-7 rounded-full shadow-md", themeConfig.bgColor)} />
-            <div>
-              <h2 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight">
-                {themeConfig.name}
-              </h2>
-              <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider mt-0.5">
-                ระบบจัดการและเก็บบันทึกข้อมูลไปรษณีย์ภัณฑ์
-              </p>
-            </div>
           </div>
+        </header>
 
-          {/* Children views */}
-          {children}
-        </div>
-      </main>
+        {/* Dynamic Announcements */}
+        <AnimatePresence>
+          {showAnnouncement && sysConfig.show && (
+            <motion.div 
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="bg-amber-500/10 border-b border-amber-500/20 overflow-hidden relative z-20 w-full"
+            >
+              <div className="max-w-xl mx-auto px-4 py-2.5 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Bell size={13} className="text-amber-600 dark:text-amber-500 flex-shrink-0" />
+                  <p className="text-[10px] font-bold text-amber-800 dark:text-amber-200/80 leading-normal">
+                    {sysConfig.announcement}
+                  </p>
+                </div>
+                <button onClick={() => setShowAnnouncement(false)} className="text-amber-600/50 hover:text-amber-600 dark:text-amber-500/50 dark:hover:text-amber-500 transition-colors">
+                  <X size={13} />
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Sync Status Toast Notification */}
+        <AnimatePresence>
+          {status && (
+            <motion.div 
+              initial={{ y: -20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: -20, opacity: 0 }}
+              className="fixed top-20 left-0 right-0 z-50 px-4 pointer-events-none"
+            >
+              <div 
+                role="status" 
+                aria-live="polite"
+                className={cn(
+                  "max-w-xs mx-auto p-3.5 rounded-2xl border shadow-2xl flex items-center gap-3.5 backdrop-blur-xl",
+                  status.type === 'success' ? "bg-emerald-500/20 border-emerald-500/30 text-emerald-800 dark:text-emerald-200" : "bg-rose-500/20 border-rose-500/30 text-rose-800 dark:text-rose-200"
+                )}
+              >
+                <div className={cn("p-1 rounded-full text-white", status.type === 'success' ? "bg-emerald-500" : "bg-rose-500")}>
+                  <CheckCircle2 size={12} className="text-white" />
+                </div>
+                <p className="text-[11px] font-extrabold tracking-tight">{status.text}</p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* MAIN VIEWPORT PANEL */}
+        <main className="flex-1 overflow-x-hidden z-10">
+          <div className="w-full max-w-5xl mx-auto px-4 py-6 md:py-10 pb-32 md:pb-12">
+            
+            {/* Header Title inside Content (Desktop only) */}
+            <div className="hidden md:flex items-center gap-3.5 mb-8">
+              <div className={cn("w-1 h-7 rounded-full shadow-md", themeConfig.bgColor)} />
+              <div>
+                <h2 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight">
+                  {themeConfig.name}
+                </h2>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider mt-0.5">
+                  ระบบจัดการและเก็บบันทึกข้อมูลไปรษณีย์ภัณฑ์
+                </p>
+              </div>
+            </div>
+
+            {/* Children views */}
+            {children}
+          </div>
+        </main>
+      </div>
 
       {/* MOBILE BOTTOM NAVIGATION - Smartphone/Tablet Only (md:hidden) */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/90 dark:bg-slate-900/80 backdrop-blur-2xl border-t border-slate-200/60 dark:border-white/5 pb-safe transition-colors duration-300" role="tablist" aria-label="เมนูหลักการดำเนินงานมือถือ">
