@@ -112,7 +112,7 @@ export const RunPage: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
               {runChecklist.map((item, idx) => (
                 <div 
-                  key={item.dept}
+                  key={`${item.dept}-${idx}`}
                   onClick={() => toggleCheck(idx)}
                   tabIndex={0}
                   onKeyDown={(e) => {

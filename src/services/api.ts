@@ -6,13 +6,35 @@ const getAuthPayload = () => {
     return sessionToken ? { sessionToken } : undefined;
 };
 
+// จัดการ response JSON อย่างปลอดภัย ป้องกันการโยน SyntaxError เมื่อได้คำตอบที่ไม่ใช่ JSON
+const handleJsonResponse = async (res: Response) => {
+    // สนับสนุน mock response ใน unit test ที่อาจไม่มีฟังก์ชัน text()
+    if (typeof res.text !== 'function') {
+        if (typeof res.json === 'function') {
+            return await res.json();
+        }
+        throw new TypeError('Response object does not support text() or json() methods');
+    }
+    
+    const text = await res.text();
+    try {
+        return JSON.parse(text);
+    } catch (e) {
+        console.warn('API returned non-JSON response:', text);
+        return { 
+            status: 'error', 
+            message: text.trim() || 'เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์ (Invalid JSON)' 
+        };
+    }
+};
+
 export const api = {
     fetchMetaData: async () => {
         const res = await fetch(API_URL, { 
             method: 'POST', 
             body: JSON.stringify({ action: 'getMetaData', auth: getAuthPayload() }) 
         });
-        return await res.json();
+        return await handleJsonResponse(res);
     },
 
     searchLogs: async (filters: any, email: string) => {
@@ -20,7 +42,7 @@ export const api = {
             method: 'POST', 
             body: JSON.stringify({ action: 'searchLogs', payload: { filters, email }, auth: getAuthPayload() }) 
         });
-        return await res.json();
+        return await handleJsonResponse(res);
     },
 
     publicSearch: async (deptName: string) => {
@@ -28,7 +50,7 @@ export const api = {
             method: 'POST', 
             body: JSON.stringify({ action: 'publicSearch', payload: { deptName } }) 
         });
-        return await res.json();
+        return await handleJsonResponse(res);
     },
 
     saveBatch: async (payload: any) => {
@@ -36,7 +58,7 @@ export const api = {
             method: 'POST', 
             body: JSON.stringify({ action: 'saveBatch', payload, auth: getAuthPayload() }) 
         });
-        const json = await res.json();
+        const json = await handleJsonResponse(res);
         if (json.status === 'error') {
             throw new Error(json.message || 'บันทึกข้อมูลล้มเหลว');
         }
@@ -48,7 +70,7 @@ export const api = {
             method: 'POST', 
             body: JSON.stringify({ action: 'deleteLog', payload: { id, type }, auth: getAuthPayload() }) 
         });
-        const json = await res.json();
+        const json = await handleJsonResponse(res);
         if (json.status === 'error') {
             throw new Error(json.message || 'ลบข้อมูลล้มเหลว');
         }
@@ -60,7 +82,7 @@ export const api = {
             method: 'POST',
             body: JSON.stringify({ action: 'requestOTP', payload: { email } })
         });
-        const json = await res.json();
+        const json = await handleJsonResponse(res);
         if (json.status === 'error') {
             throw new Error(json.message || 'การขอรหัส OTP ล้มเหลว');
         }
@@ -72,7 +94,7 @@ export const api = {
             method: 'POST',
             body: JSON.stringify({ action: 'verifyOTP', payload: { email, code } })
         });
-        const json = await res.json();
+        const json = await handleJsonResponse(res);
         if (json.status === 'error') {
             throw new Error(json.message || 'รหัส OTP ไม่ถูกต้องหรือหมดอายุ');
         }
@@ -84,7 +106,7 @@ export const api = {
             method: 'POST',
             body: JSON.stringify({ action: 'feedback', payload, auth: getAuthPayload() })
         });
-        const json = await res.json();
+        const json = await handleJsonResponse(res);
         if (json.status === 'error') {
             throw new Error(json.message || 'บันทึกข้อเสนอแนะล้มเหลว');
         }
