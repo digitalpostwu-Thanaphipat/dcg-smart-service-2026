@@ -136,11 +136,22 @@
 
 ---
 
-### 📌 เฟสที่ 8: การย้ายระบบขึ้น Production — Migration Day *(วางแผนไว้)*
-* **ช่วงเวลา:** 5 มิถุนายน 2569 (ศุกร์)
-* **แผนงาน:**
-  * Phase A: เตรียม Google Sheets ให้ครบทุกชีท (~30 นาที)
-  * Phase B: Deploy Apps Script + ตั้ง Backup Trigger (~15 นาที)
-  * Phase C: แก้ Code Quality Issues 2.2, 2.3, 2.5 (~20 นาที)
-  * Phase D: ทดสอบวงจรครบ — Login → บันทึก → Feedback → Report (~15 นาที)
-* **รายละเอียดฉบับเต็ม:** ดู [migration_plan_v2.md — Section 6](./migration_plan_v2.md)
+### 📌 เฟสที่ 8: การดำเนินการวัน Migration Day — 5 มิถุนายน 2569 (ศุกร์)
+* **ช่วงเวลา:** 5 มิถุนายน 2569 (ศุกร์) — ดำเนินการจริง
+* **กิจกรรมหลักและการดำเนินการ:**
+  * **[Phase C: Code Quality & Build — ✅ เสร็จสมบูรณ์]:**
+    * แก้ไข type errors ในชุดการทดสอบย่อย (`FeedbackButton.test.tsx` และ `backend.test.ts`)
+    * ปรับปรุงไฟล์ตั้งค่า `tsconfig.app.json` โดยนำเข้า type `"node"` เพื่อรองรับการทำงานของโมดูล `fs`, `path`, และ `process` ในการทดสอบ
+    * ยืนยันผลการ Build ผ่าน `npm run build` สำเร็จ 100% (ไม่มีข้อผิดพลาด) พร้อม PWA Service Worker สำหรับการทำงานแบบออฟไลน์
+    * รันการทดสอบ Unit Tests ผ่าน Vitest สำเร็จครบถ้วน 31 เคส (`31/31 tests passed`)
+  * **[Git Cleanup & Remote Update — ✅ เสร็จสมบูรณ์]:**
+    * อัปเดต `.gitignore` เพื่อยกเว้นโฟลเดอร์ที่ไม่จำเป็น ได้แก่ `node_modules/`, `dist/`, `.gemini/` และโฟลเดอร์ `@/` (ที่เป็นตัวสคริปต์สำรอง) พร้อมทำการลบ Cache การติดตามเดิมออก (`git rm -r --cached`)
+    * ทำการติดตามการเปลี่ยนแปลง (Git Track) โฟลเดอร์ `คู่มือการใช้งานระบบบริหารงานไปรษณีย์/` และไฟล์ `next_steps_roadmap.md` ตามความต้องการของผู้ใช้งาน
+    * เปลี่ยน Git Remote URL ไปที่ Repository ใหม่:
+      `https://github.com/digitalpostwu-Thanaphipat/dcg-smart-service-2026.git`
+    * ทำการ Commit และ Push ขึ้นสาขา `main` เรียบร้อยแล้ว
+  * **[Backend Web App URL Verification — ✅ ตรวจสอบแล้ว]:**
+    * ยืนยันว่า Web App URL ใหม่ (`https://script.google.com/macros/s/AKfycbyhXXtSjtMvbeGWB4VEsFFo_zLQJ_3BGfXNpX1MByDC3EpuWCkEk-5VfCrUjODm-4jSFg/exec`) ถูกตั้งค่าใน `src/config.ts` แล้ว
+    * ทำการจำลองการยิงคำขอแบบ POST `getMetaData` ไปยัง URL หลังบ้านจริงสำเร็จ ได้รับรายชื่อแผนก บริการ และการตั้งค่าของตารางอย่างถูกต้อง ครบถ้วน
+* **สถานะความคืบหน้า:** ระบบฝั่ง Frontend และโค้ดหลังบ้าน (Apps Script) ของโปรเจกต์ Dev พร้อมสำหรับการติดตั้งชีต (Phase A) และเริ่มการทดสอบการบันทึกข้อมูล (Phase D) แล้ว
+

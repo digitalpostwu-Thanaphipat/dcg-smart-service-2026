@@ -148,14 +148,14 @@
 - [ ] ทดสอบเรียก URL ผ่านเบราวเซอร์: `เปิดแท็บใหม่แล้วเพิ่ม ?action=getMetaData` ต้องได้ JSON กลับมา
 - [ ] รัน `setupDailyBackupTrigger()` เพื่อตั้ง Auto-Backup Trigger ทุกวัน 02:00 น.
 
-### 🟠 Phase C: แก้ Code Quality Issues (AI ทำเอง) — ~20 นาที
+### 🟠 Phase C: แก้ Code Quality Issues (AI ทำเอง) — ✅ เสร็จสมบูรณ์
 
 **AI ทำให้ คุณตรวจผล**
 
-- [ ] **2.3** แก้ `bg-purple-650` เป็น `bg-purple-600` ใน 2 ไฟล์ (App.tsx + PublicTrackView.tsx)
-- [ ] **2.5** แก้ ESLint version mismatch (รัน `npm install` ใหม่)
-- [ ] **2.2** แทนที่ `alert()` / `confirm()` (7 จุด) ด้วย Toast/Dialog component
-- [ ] ตรวจยืนยัน Build ผ่าน (`tsc --noEmit` + `vite build`)
+- [x] **2.3** แก้ `bg-purple-650` เป็น `bg-purple-600` ใน 2 ไฟล์ (App.tsx + PublicTrackView.tsx)
+- [x] **2.5** แก้ ESLint version mismatch (รัน `npm install` ใหม่)
+- [x] **2.2** แทนที่ `alert()` / `confirm()` (7 จุด) ด้วย Toast/Dialog component
+- [x] ตรวจยืนยัน Build ผ่าน (`tsc --noEmit` + `vite build`)
 
 ### 🔵 Phase D: ทดสอบวงจรครบ (ทำร่วมกัน) — ~15 นาที
 

@@ -4,14 +4,14 @@
 
 เอกสารในวิกินี้ได้รับการรวบรวมจากผลการวิเคราะห์และตรวจสอบด้านระบบโครงสร้างพื้นฐาน ความปลอดภัย และการเข้าถึงข้อมูล (Accessibility) โดยแบ่งเป็นหัวข้อหลักดังต่อไปนี้:
 
-> **อัปเดตล่าสุด**: 4 มิถุนายน 2569 | สถานะ: Q0 เสร็จ ✅ | Migration Step 1-2 กำหนดวัน 5 มิ.ย. 2569
+> **อัปเดตล่าสุด**: 5 มิถุนายน 2569 | สถานะ: Phase C (Code Quality & Build) เสร็จสมบูรณ์ ✅, โค้ดถูก Commit และ Push ขึ้น Repository ใหม่แล้ว
 
 ---
 
 ## 📂 สารบัญเอกสารทั้งหมด (Wiki Pages Index)
 
 1. **[Chronological Audit Log / บันทึกประวัติการตรวจสอบย้อนหลัง](./log.md)**
-   * ลำดับประวัติและกิจกรรมที่เกิดขึ้นในระบบ ตั้งแต่การรวบรวมและวิเคราะห์โครงสร้างข้อมูล ปัญหาการทำงาน ไปจนถึงผลสรุปการตรวจสอบความปลอดภัยและการเข้าถึง (WCAG)
+   * ลำดับประวัติและกิจกรรมที่เกิดขึ้นในระบบ ตั้งแต่การรวบรวมและวิเคราะห์โครงสร้างข้อมูล ปัญหาการทำงาน ไปจนถึงผลสรุปการตรวจสอบความปลอดภัยและการเข้าถึง (WCAG) และความคืบหน้าการย้ายระบบในวัน Migration Day
 2. **[System Architecture / สถาปัตยกรรมระบบ](./architecture.md)**
    * รายละเอียดโครงสร้างการจัดวางไฟล์ (File Structure) ปัญหาไฟล์หาย/ผิดตำแหน่ง (File Path Mismatch) ความแตกต่างระหว่าง API Payload ฝั่ง Frontend และ Backend รวมถึงวิเคราะห์สถานะ PWA (Progressive Web App)
 3. **[Security Vulnerabilities & Remediation / ช่องโหว่ความปลอดภัยและการแก้ไข](./vulnerabilities.md)**
@@ -22,7 +22,7 @@
    * คำแนะนำการจัดเตรียมและ Deploy ระบบบน Google Sheets / Web App, รายการไฟล์ซอร์สโค้ดควบคุมระบบ
 6. **[🏠 Architecture Analysis Report / รายงานวิเคราะห์สถาปัตยกรรม (v2.1)](./architecture_analysis_report.md)** ✅ *อัปเดตแล้ว*
    * รายงานวิเคราะห์สถาปัตยกรรม Frontend/Backend, Code Quality Issues (5 หมวด), Auto-Backup Plan, และ Roadmap โมดูล Q0-Q4+ (รวม 10 โมดูล) — Q0 เสร็จสมบูรณ์แล้ว
-7. **[🚀 Migration Plan v2 / แผนย้ายระบบ Dev → Production](./migration_plan_v2.md)** 🔜 *กำหนดทำ 5 มิ.ย. 2569*
+7. **[🚀 Migration Plan v2 / แผนย้ายระบบ Dev → Production](./migration_plan_v2.md)** 🟢 *อัปเดตความคืบหน้า (Phase C เสร็จสมบูรณ์)*
    * แผนงานย้ายระบบ 4 ขั้นตอน + Rollback Plan + **Section 6: แผนงานวันพรุ่งนี้** (Phase A-D Checklist)
 8. **[ADR 0001: Auth Strategy](./adr/0001-auth-strategy.md)**
    * กลยุทธ์ Authentication (OTP + Google Sign-In + Mock Login)
