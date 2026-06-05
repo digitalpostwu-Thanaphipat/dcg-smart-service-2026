@@ -24,10 +24,10 @@ function runDataMigration() {
   
   Logger.log("🏁 เริ่มต้นการย้ายข้อมูลจากสเปรดชีตเดิม...");
   
-  // 1. ย้ายข้อมูลการเดินรถรับเอกสารภายใน (Tx_Submissions -> Tx_InternalRun)
-  migrateSheetData(ssOld, "Tx_Submissions", ssNew, "Tx_InternalRun", function(oldRow, idx) {
+  // 1. ย้ายข้อมูลการเดินรถรับเอกสารภายใน (Tx_InternalRun -> Tx_InternalRun)
+  migrateSheetData(ssOld, "Tx_InternalRun", ssNew, "Tx_InternalRun", function(oldRow, idx) {
     return [
-      generateTxID("RUN", oldRow.Timestamp, idx),
+      oldRow.TxID || generateTxID("RUN", oldRow.Timestamp, idx),
       oldRow.Timestamp ? new Date(oldRow.Timestamp) : new Date(),
       oldRow.DeptName || oldRow.Department || "ไม่ระบุหน่วยงาน",
       oldRow.Route || "ไม่ระบุสาย",
@@ -38,15 +38,15 @@ function runDataMigration() {
     ];
   });
   
-  // 2. ย้ายข้อมูลงานคัดแยกไปรษณีย์ภัณฑ์ (Tx_Delegations -> Tx_InternalSort)
-  migrateSheetData(ssOld, "Tx_Delegations", ssNew, "Tx_InternalSort", function(oldRow, idx) {
+  // 2. ย้ายข้อมูลงานคัดแยกไปรษณีย์ภัณฑ์ (Tx_InternalSort -> Tx_InternalSort)
+  migrateSheetData(ssOld, "Tx_InternalSort", ssNew, "Tx_InternalSort", function(oldRow, idx) {
     var normal = parseInt(oldRow.NormalCount) || parseInt(oldRow.RegularCount) || 0;
     var register = parseInt(oldRow.RegisterCount) || 0;
     var privateCount = parseInt(oldRow.PrivateCount) || 0;
-    var total = normal + register + privateCount;
+    var total = parseInt(oldRow.Total) || (normal + register + privateCount);
     
     return [
-      generateTxID("SORT", oldRow.Timestamp, idx),
+      oldRow.TxID || generateTxID("SORT", oldRow.Timestamp, idx),
       oldRow.Timestamp ? new Date(oldRow.Timestamp) : new Date(),
       oldRow.DeptName || oldRow.Department || "ไม่ระบุหน่วยงาน",
       normal,
@@ -58,10 +58,10 @@ function runDataMigration() {
     ];
   });
   
-  // 3. ย้ายข้อมูลงานนำส่งไปรษณีย์ภายนอก (Tx_Feedback -> Tx_ExternalPost)
-  migrateSheetData(ssOld, "Tx_Feedback", ssNew, "Tx_ExternalPost", function(oldRow, idx) {
+  // 3. ย้ายข้อมูลงานนำส่งไปรษณีย์ภายนอก (Tx_ExternalPost -> Tx_ExternalPost)
+  migrateSheetData(ssOld, "Tx_ExternalPost", ssNew, "Tx_ExternalPost", function(oldRow, idx) {
     return [
-      generateTxID("EXT", oldRow.Timestamp, idx),
+      oldRow.TxID || generateTxID("EXT", oldRow.Timestamp, idx),
       oldRow.Timestamp ? new Date(oldRow.Timestamp) : new Date(),
       oldRow.RequestingDept || oldRow.DeptName || oldRow.Department || "ไม่ระบุหน่วยงาน",
       oldRow.ServiceType || oldRow.ServiceName || "ไม่ระบุประเภท",
