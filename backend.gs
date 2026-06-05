@@ -3,10 +3,20 @@
 // [GGSheet Protocol] - ฐานข้อมูลหลัก (สามารถสลับไปดึงจาก Script Properties หรือใช้ ID สำรองเริ่มต้นนี้)
 var SPREADSHEET_ID = PropertiesService.getScriptProperties().getProperty("SPREADSHEET_ID") || "1AL0AHGleUZ1UmS2N3QAg3vM0z_E1ymJ8Eg9FfUneAD0";
 
+/**
+ * ดักจับคำขอแบบ HTTP GET สำหรับเว็บบัญชีผู้ใช้งานภายนอก (ถ้ามี)
+ * @param {Object} e - ข้อมูลพารามิเตอร์ของคำขอ GET
+ * @returns {HtmlOutput|TextOutput} ผลลัพธ์แสดงสถานะของบริการ API
+ */
 function doGet(e) {
   return ContentService.createTextOutput("DCG Smart Track API is running.");
 }
 
+/**
+ * ดักจับคำขอแบบ HTTP POST เพื่อประมวลผลการทำงานหลักของระบบ API (doPost)
+ * @param {Object} e - ข้อมูลที่ถูกส่งมาแบบ HTTP POST รวมถึง body และ payload
+ * @returns {TextOutput} ข้อมูล JSON ผลการประมวลผลของ Action ต่าง ๆ
+ */
 function doPost(e) {
   var json = JSON.parse(e.postData.contents);
   var action = json.action;
@@ -52,6 +62,12 @@ function doPost(e) {
 // --- Helper Functions ---
 
 // ตรวจสอบ Session Token และสิทธิ์การใช้งานช่วงวันทำการ (จันทร์-ศุกร์)
+/**
+ * ตรวจสอบความถูกต้องและสิทธิ์การใช้งานของ Session Token รวมถึงสิทธิ์จำกัดช่วงวันทำการ (จันทร์-ศุกร์)
+ * @param {string} sessionToken - โทเค็นเซสชันที่ส่งมาจากฝั่งผู้ใช้งานเพื่อยืนยันตัวตน
+ * @returns {Object} ข้อมูลอีเมลของผู้ใช้งานที่ได้รับอนุญาต
+ * @throws {Error} เกิดข้อผิดพลาดหาก Session ไม่ถูกต้องหรืออยู่นอกเวลาทำงาน
+ */
 function verifySessionToken(sessionToken) {
   var today = new Date();
   
@@ -98,6 +114,10 @@ function verifySessionToken(sessionToken) {
 }
 
 // เปิดสเปรดชีตอย่างปลอดภัย
+/**
+ * ดึงออบเจกต์สเปรดชีตหลักของระบบอย่างปลอดภัย โดยดึงจาก ID ใน Script Properties หรือใช้งาน Active Spreadsheet เป็นทางเลือกสำรอง
+ * @returns {Spreadsheet} ออบเจกต์ Google Spreadsheet หลัก
+ */
 function getSpreadsheet() {
   if (SPREADSHEET_ID && SPREADSHEET_ID !== "") {
     try {
@@ -110,6 +130,11 @@ function getSpreadsheet() {
 }
 
 // ป้องกัน Formula Injection (ใส่ ' นำหน้าข้อมูลที่ขึ้นต้นด้วย =)
+/**
+ * ล้างข้อมูลและป้องกันช่องโหว่ Formula / CSV Injection (OWASP) โดยการแทรกอัญประกาศเดี่ยว (') หากตรวจพบสัญลักษณ์สูตรคำนวณ
+ * @param {*} val - ค่าข้อมูลที่ต้องการตรวจสอบความสะอาด
+ * @returns {*} ค่าข้อมูลที่ปลอดภัยสำหรับการกรอกลงตาราง
+ */
 function sanitizeInput(val) {
   if (typeof val === 'string') {
     // Trim leading whitespace/newlines to prevent bypass (e.g. " =1+1", "\n=IMPORTRANGE(...)")
@@ -124,6 +149,11 @@ function sanitizeInput(val) {
 }
 
 // ช่วยดึงข้อมูลและแปลงเป็น Object Array ตามหัวคอลัมน์ในแถวแรก
+/**
+ * ดึงข้อมูลในตารางและแปลงเป็นอาเรย์ของออบเจกต์ (Array of Objects) โดยใช้ชื่อคอลัมน์ในแถวแรกเป็นคีย์
+ * @param {Sheet} sheet - ออบเจกต์ชีตที่ต้องการดึงข้อมูล
+ * @returns {Object[]} ข้อมูลตารางในรูปแบบอาเรย์ของออบเจกต์
+ */
 function getSheetDataAsObjects(sheet) {
   if (!sheet) return [];
   var range = sheet.getDataRange();
@@ -147,6 +177,11 @@ function getSheetDataAsObjects(sheet) {
 }
 
 // แปลงรูปแบบวันที่ให้อยู่ในรูป YYYY-MM-DD
+/**
+ * แปลงรูปแบบวันที่ (Date/Timestamp) ให้อยู่ในรูปสตริงมาตรฐาน YYYY-MM-DD
+ * @param {Date|string|number} date - วันที่ที่ต้องการฟอร์แมต
+ * @returns {string} วันที่ฟอร์แมตแล้ว (เช่น "2026-06-05") หรือสตริงว่างหากไม่ถูกต้อง
+ */
 function formatYYYYMMDD(date) {
   var d = new Date(date);
   if (isNaN(d.getTime())) return "";
@@ -159,6 +194,10 @@ function formatYYYYMMDD(date) {
 // --- Core API Actions ---
 
 // 1. ดึง Metadata พื้นฐาน (ผู้ใช้, หน่วยงาน, บริการ, ตั้งค่า)
+/**
+ * ดึงข้อมูลชุดตั้งต้น (Metadata) สำหรับหน้าระบบ ได้แก่ รายชื่อผู้ใช้ แผนก บริการ และการตั้งค่าต่าง ๆ
+ * @returns {Object} ออบเจกต์รวมกลุ่มข้อมูล Metadata
+ */
 function getMetaData() {
   var ss = getSpreadsheet();
   
@@ -217,6 +256,16 @@ function getMetaData() {
 }
 
 // 2. บันทึกข้อมูลแบบ Batch ลงตารางธุรกรรมแยกตามประเภท
+/**
+ * บันทึกข้อมูลแบบกลุ่ม (Batch Write) ลงในตารางธุรกรรมแยกตามประเภท พร้อมป้องกันปัญหา Race Condition และ Formula Injection
+ * @param {Object} payload - ออบเจกต์ข้อมูลธุรกรรมและประเภทที่ต้องการบันทึก
+ * @param {string} payload.type - ประเภทธุรกรรม ('run' | 'sort' | 'ext')
+ * @param {Object[]} payload.items - รายการพัสดุ/จดหมายที่ต้องการบันทึก
+ * @param {Object} [payload.common] - ข้อมูลร่วม เช่น สายส่ง รอบการเดินรถ อีเมลผู้บันทึก
+ * @param {string} payload.txId - ไอดีธุรกรรม (Transaction ID)
+ * @returns {Object} ข้อความรายงานผลสำเร็จพร้อม TxID
+ * @throws {Error} ข้อผิดพลาดเมื่อคิวบันทึกข้อมูลหนาแน่นหรือพารามิเตอร์ไม่ถูกต้อง
+ */
 function saveBatch(payload) {
   var type = payload.type;
   var items = payload.items;
@@ -325,6 +374,13 @@ function saveBatch(payload) {
 }
 
 // 3. ค้นหาประวัติย้อนหลังตามตัวกรอง
+/**
+ * ค้นหาประวัติธุรกรรมย้อนหลังจาก 3 ตารางประวัติหลักตามตัวกรองที่ระบุ (วันที่ แผนก)
+ * @param {Object} payload - ตัวกรองและพารามิเตอร์การค้นหา
+ * @param {Object} [payload.filters] - เงื่อนไขตัวกรอง เช่น startDate, endDate, dept
+ * @param {string} [payload.email] - อีเมลผู้บันทึกกรณีต้องการจำกัดสิทธิ์การดูข้อมูล
+ * @returns {Object} ผลลัพธ์แบ่งกลุ่มประวัติ run, sort และ ext
+ */
 function searchLogs(payload) {
   var filters = payload.filters || {};
   var email = payload.email;
@@ -395,6 +451,14 @@ function searchLogs(payload) {
 }
 
 // 4. ลบรายการโดยค้นหาจาก TxID
+/**
+ * ลบรายการประวัติธุรกรรมออกจากตารางประวัติธุรกรรม โดยค้นหาจากรหัส TxID
+ * @param {Object} payload - พารามิเตอร์ในการระบุข้อมูลที่ต้องการลบ
+ * @param {string} payload.id - รหัส TxID ที่ต้องการลบ
+ * @param {string} payload.type - ประเภทธุรกรรม ('run' | 'sort' | 'ext')
+ * @returns {Object} ผลสรุปจำนวนแถวที่ลบสำเร็จ
+ * @throws {Error} ข้อผิดพลาดในการรอสิทธิ์เขียนข้อมูลหรือรูปแบบไม่ถูกต้อง
+ */
 function deleteLog(payload) {
   var id = payload.id;
   var type = payload.type;
@@ -444,6 +508,12 @@ function deleteLog(payload) {
 }
 
 // 5. ค้นหารายการแยกหน่วยงาน (การค้นหาของฝั่งประชาสัมพันธ์/ผู้รับปลายทาง)
+/**
+ * ฟังก์ชันสืบค้นประวัติพัสดุ/จดหมายแยกสำหรับบุคคลภายนอกหรือฝั่งรับบริการ ค้นหาเฉพาะเจาะจงรายหน่วยงาน
+ * @param {Object} payload - ข้อมูลคำค้นหา
+ * @param {string} payload.deptName - ชื่อหน่วยงานผู้รับ/ผู้ส่งที่ต้องการค้นหา
+ * @returns {Object} ข้อมูลประวัติธุรกรรม run, sort และ ext ของแผนกนั้น ๆ
+ */
 function publicSearch(payload) {
   var deptName = payload.deptName;
   if (!deptName) {
@@ -566,6 +636,15 @@ function publicSearch(payload) {
 }
 
 // ค้นหาแถวในชีทตามอีเมลและเขียนข้อมูลทับ
+/**
+ * บันทึกหรืออัปเดตข้อมูลเซสชันความปลอดภัยและ OTP ลงในชีตจัดการสิทธิ์ผู้ใช้งาน
+ * @param {Sheet} sheet - ออบเจกต์ชีตประวัติ OTP Store
+ * @param {string} email - อีเมลเจ้าหน้าที่ที่เกี่ยวข้อง
+ * @param {string|null} otpCode - รหัส OTP 6 หลัก (หากเป็น null จะไม่ได้รับการอัปเดต)
+ * @param {Date|null} otpExpires - วันเวลาหมดอายุของรหัส OTP
+ * @param {string|null} sessionToken - รหัสโทเค็นเซสชันเข้าใช้งานระบบ
+ * @param {Date|null} sessionExpires - วันเวลาหมดอายุของโทเค็นเซสชัน
+ */
 function writeSessionRecord(sheet, email, otpCode, otpExpires, sessionToken, sessionExpires) {
   var dataRange = sheet.getDataRange();
   var values = dataRange.getValues();
@@ -604,6 +683,13 @@ function writeSessionRecord(sheet, email, otpCode, otpExpires, sessionToken, ses
 }
 
 // ขอรหัส OTP ส่งเข้าอีเมลผู้ใช้งาน
+/**
+ * ดำเนินการสร้างรหัส OTP 6 หลัก บันทึกลงฐานข้อมูล และจัดส่งผ่านระบบอีเมลเพื่อเข้าใช้งานระบบความปลอดภัย
+ * @param {Object} payload - ข้อมูลอีเมลผู้ใช้งานที่ร้องขอ
+ * @param {string} payload.email - อีเมลลงท้าย @wu.ac.th
+ * @returns {Object} ข้อความแจ้งผลส่งสำเร็จ
+ * @throws {Error} ข้อผิดพลาดเมื่อไม่พบอีเมลในระบบ หรือระบบเมลขัดข้อง
+ */
 function requestOTP(payload) {
   var email = payload.email ? payload.email.trim() : "";
   if (!email) {
@@ -662,6 +748,14 @@ function requestOTP(payload) {
 }
 
 // ตรวจสอบ OTP และออก Token
+/**
+ * ตรวจสอบความถูกต้องของรหัส OTP และสร้าง Session Token เพื่อเข้าสู่ระบบของแต่ละรายวัน
+ * @param {Object} payload - ข้อมูลที่ใช้ตรวจสอบ
+ * @param {string} payload.email - อีเมลผู้ใช้
+ * @param {string} payload.code - รหัส OTP 6 หลัก
+ * @returns {Object} ข้อมูลผู้ใช้และ Token ยืนยันตัวตนสำเร็จ
+ * @throws {Error} ข้อผิดพลาดกรณีรหัสไม่ถูกต้อง, หมดอายุ, หรืออยู่นอกเวลาทำงาน
+ */
 function verifyOTP(payload) {
   var email = payload.email ? payload.email.trim() : "";
   var code = payload.code ? payload.code.trim() : "";
@@ -728,6 +822,11 @@ function verifyOTP(payload) {
 }
 
 // ตรวจสอบการจำกัดสิทธิ์วันทำการ (จันทร์-ศุกร์) จาก System_Config
+/**
+ * ตรวจสอบจากค่ากำหนดของระบบ (System_Config) ว่าต้องจำกัดการเข้าใช้งานเฉพาะวันทำงาน (จันทร์-ศุกร์) หรือไม่
+ * @param {Spreadsheet} ss - ออบเจกต์สเปรดชีตหลัก
+ * @returns {boolean} ค่าสถานะจำกัดการเข้าใช้งาน (true = จำกัดเฉพาะวันจันทร์-ศุกร์, false = ใช้งานได้ตลอดเวลา)
+ */
 function shouldRestrictWorkdays(ss) {
   try {
     var configSheet = ss.getSheetByName("System_Config");
@@ -746,6 +845,9 @@ function shouldRestrictWorkdays(ss) {
 }
 
 // ฟังก์ชันใช้สำหรับกดรันในสคริปต์เพื่อกดยืนยันสิทธิ์ส่งอีเมล (Authorization) ครั้งแรก
+/**
+ * ฟังก์ชันสำหรับผู้ดูแลระบบเรียกใช้งานทดสอบ เพื่อให้ระบบอนุมัติสิทธิ์ (Authorization) การส่งอีเมลของโครงการ Apps Script ในครั้งแรก
+ */
 function testSendEmail() {
   var ss = getSpreadsheet();
   var userEmail = Session.getActiveUser().getEmail();
@@ -763,6 +865,16 @@ function testSendEmail() {
 
 // --- Feedback Channel Actions (Milestone 2) ---
 
+/**
+ * บันทึกรายงานปัญหาและข้อเสนอแนะของผู้ใช้ลงตาราง พร้อมกับยิงการแจ้งเตือนไปยัง LINE Notify ของผู้ดูแลระบบกรณีปัญหาร้ายแรง (High/Critical)
+ * @param {Object} payload - ข้อมูลข้อเสนอแนะและบั๊กที่ส่งมา
+ * @param {string} payload.type - ประเภทรายงาน ('Bug' | 'Suggestion' | 'Other')
+ * @param {string} payload.severity - ระดับความร้ายแรง ('Low' | 'Medium' | 'High' | 'Critical')
+ * @param {string} payload.description - คำอธิบายรายละเอียด
+ * @param {string} payload.staffEmail - อีเมลพนักงานผู้ส่งรายงาน
+ * @returns {Object} ข้อความยืนยันผลสำเร็จ
+ * @throws {Error} ข้อผิดพลาดเมื่อข้อมูลไม่ถูกต้องตามรูปแบบข้อจำกัดความปลอดภัย
+ */
 function handleFeedback(payload) {
   var type = payload.type;
   var severity = payload.severity;
@@ -832,6 +944,10 @@ function handleFeedback(payload) {
   }
 }
 
+/**
+ * ส่งข้อความแจ้งเตือนผ่าน API บริการ LINE Notify ไปยังกลุ่มสนทนาของผู้ดูแลระบบ
+ * @param {string} message - ข้อความแจ้งเตือนที่ต้องการส่ง
+ */
 function sendLineNotification(message) {
   var token = PropertiesService.getScriptProperties().getProperty("LINE_NOTIFY_TOKEN");
   if (!token) {
@@ -894,6 +1010,9 @@ function getOrCreateBackupFolder() {
 }
 
 // ฟังก์ชันหลักในการรันการสำรองข้อมูล (ส่งออกเฉพาะ 3 ชีทธุรกรรมเป็น Excel .xlsx)
+/**
+ * ฟังก์ชันหลักในการทำสำรองข้อมูลระบบ โดยสร้างชีตชั่วคราว ดึงตารางธุรกรรมประวัติหลัก 3 ตาราง ส่งออกเป็นไฟล์ Excel (.xlsx) และบันทึกลง Drive
+ */
 function runAutoBackup() {
   var tempSSId = null;
   
@@ -970,6 +1089,10 @@ function runAutoBackup() {
 }
 
 // ลบไฟล์สำรองที่มีอายุเกิน 30 วันในโฟลเดอร์สำรองข้อมูล
+/**
+ * บังคับใช้นโยบายการลบไฟล์ข้อมูลสำรองย้อนหลังที่เก่าเกิน 30 วันอัตโนมัติ (Retention Policy) เพื่อป้องกันปริมาณพื้นที่เต็มใน Google Drive
+ * @param {Folder} folder - ออบเจกต์โฟลเดอร์ที่เก็บไฟล์สำรองข้อมูล
+ */
 function applyBackupRetention(folder) {
   var retentionDays = 30;
   var cutoffDate = new Date();
@@ -997,6 +1120,9 @@ function applyBackupRetention(folder) {
 }
 
 // ตั้งค่า Daily Trigger ในเวลา 02:00 น. โดยหลีกเลี่ยงการสร้าง Trigger ซ้ำซ้อน
+/**
+ * ตั้งค่าการรันอัตโนมัติ (Programmatic Trigger) รายวันของสคริปต์สำรองข้อมูล ในช่วงเวลา 02.00 น. - 03.00 น.
+ */
 function setupDailyBackupTrigger() {
   var triggerFunctionName = "runAutoBackup";
   var triggers = ScriptApp.getProjectTriggers();
