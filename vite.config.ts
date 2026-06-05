@@ -4,7 +4,7 @@ import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   test: {
     globals: true,
     environment: 'jsdom',
@@ -19,7 +19,7 @@ export default defineConfig({
   },
   plugins: [
     react(),
-    VitePWA({
+    mode !== 'test' && VitePWA({
       registerType: 'prompt',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
       manifest: {
@@ -42,6 +42,7 @@ export default defineConfig({
           }
         ]
       }
+    // })
     })
   ],
-})
+}))
