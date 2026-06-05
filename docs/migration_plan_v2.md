@@ -148,22 +148,24 @@
 - [ ] ทดสอบเรียก URL ผ่านเบราวเซอร์: `เปิดแท็บใหม่แล้วเพิ่ม ?action=getMetaData` ต้องได้ JSON กลับมา
 - [ ] รัน `setupDailyBackupTrigger()` เพื่อตั้ง Auto-Backup Trigger ทุกวัน 02:00 น.
 
-### 🟠 Phase C: แก้ Code Quality Issues (AI ทำเอง) — ✅ เสร็จสมบูรณ์
+### 🟠 Phase C: แก้ Code Quality Issues & Hotfixes (AI ทำเอง) — ✅ เสร็จสมบูรณ์
 
 **AI ทำให้ คุณตรวจผล**
 
 - [x] **2.3** แก้ `bg-purple-650` เป็น `bg-purple-600` ใน 2 ไฟล์ (App.tsx + PublicTrackView.tsx)
 - [x] **2.5** แก้ ESLint version mismatch (รัน `npm install` ใหม่)
 - [x] **2.2** แทนที่ `alert()` / `confirm()` (7 จุด) ด้วย Toast/Dialog component
-- [x] ตรวจยืนยัน Build ผ่าน (`tsc --noEmit` + `vite build`)
+- [x] **Hotfix 1:** แก้ไข React Key ซ้ำเมื่อชื่อหน่วยงานซ้ำกันใน [RunPage.tsx](file:///D:/[DEV] __WUS_Track_DB/src/pages/RunPage.tsx)
+- [x] **Hotfix 2:** เพิ่ม `handleJsonResponse` ใน [api.ts](file:///D:/[DEV] __WUS_Track_DB/src/services/api.ts) เพื่อดักจับข้อความที่ไม่ใช่ JSON และป้อนเข้า Error handler อย่างปลอดภัย
+- [x] ตรวจยืนยัน Build ผ่าน (`tsc -b` + `vite build` สำเร็จ 100%)
 
-### 🔵 Phase D: ทดสอบวงจรครบ (ทำร่วมกัน) — ~15 นาที
+### 🔵 Phase D: ทดสอบวงจรครบ (ทำร่วมกัน) — 🟡 กำลังดำเนินการ
 
 - [ ] รัน `npm run dev` แล้วทดสอบล็อกอินด้วย OTP ผ่าน API ตัวจริง
 - [ ] ทดสอบบันทึกธุรกรรม (Run / Sort / External) ดูว่าข้อมูลลงชีทจริง
 - [ ] ทดสอบปุ่ม Feedback — ส่งรายงานทดสอบดูว่าปรากฏใน `Feedback_Reports`
 - [ ] ตรวจสอบรายงานค้นหาผ่าน Report tab
-- [ ] ยืนยันว่าระบบทำงานได้ถูกต้องครบวงจร
+- [ ] ยืนยันว่าระบบทำงานได้ถูกต้องครบวงจร (รวมถึงการซิงค์ข้อมูลแบบออฟไลน์เมื่อมีปัญหาเน็ตและแจ้งเตือนอย่างถูกต้อง)
 
 ---
 

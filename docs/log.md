@@ -151,7 +151,12 @@
       `https://github.com/digitalpostwu-Thanaphipat/dcg-smart-service-2026.git`
     * ทำการ Commit และ Push ขึ้นสาขา `main` เรียบร้อยแล้ว
   * **[Backend Web App URL Verification — ✅ ตรวจสอบแล้ว]:**
-    * ยืนยันว่า Web App URL ใหม่ (`https://script.google.com/macros/s/AKfycbyhXXtSjtMvbeGWB4VEsFFo_zLQJ_3BGfXNpX1MByDC3EpuWCkEk-5VfCrUjODm-4jSFg/exec`) ถูกตั้งค่าใน `src/config.ts` แล้ว
+    * ยืนยันว่า Web App URL ใหม่ (`https://script.google.com/macros/s/AKfycbyhXXtSjtMvbeGWB4VEsFFo_zLQJ_3BGfXNpX1MByDC3EpuWCkEk-5VfCrUjODm-4jSFg/exec`) ถูกตั้งค่า in `src/config.ts` แล้ว
     * ทำการจำลองการยิงคำขอแบบ POST `getMetaData` ไปยัง URL หลังบ้านจริงสำเร็จ ได้รับรายชื่อแผนก บริการ และการตั้งค่าของตารางอย่างถูกต้อง ครบถ้วน
+  * **[Hotfixes on Migration Day — ✅ เสร็จสมบูรณ์]:**
+    * **แก้ไขปัญหา React Duplicate Keys:** ตรวจพบและแก้ไขปัญหาคีย์ซ้ำในหน้าแสดงรายชื่อหน่วยงานเช็คลิสต์ [RunPage.tsx](file:///D:/[DEV] __WUS_Track_DB/src/pages/RunPage.tsx#L115) โดยใส่ตัวชี้ตำแหน่ง Array (`idx`) เข้าไปเป็นส่วนหนึ่งของคีย์เพื่อรับประกันความยูนีค
+    * **แก้ไขปัญหา JSON Parsing SyntaxError:** เพิ่มฟังก์ชัน `handleJsonResponse` ใน [api.ts](file:///D:/[DEV] __WUS_Track_DB/src/services/api.ts#L10) เพื่อดักจับและส่งผ่านข้อความตอบกลับที่ไม่ใช่ JSON (เช่น ข้อความธรรมดาจากการยิงคำขอของระบบที่ติดปัญหาการเชื่อมต่อ) กลับคืนมาเป็นออบเจกต์ข้อผิดพลาดอย่างสุภาพ ป้องกันหน้าเว็บค้างหรือแสดงผลแบบแครช พร้อมทั้งแก้ไข Mock Fallback สำหรับ Unit Test เรียบร้อย
+    * **ทดสอบระบบและบันทึกประวัติ:** ทำการทดสอบรัน Unit Tests ผ่านครบถ้วน 31 เคส และสร้างคอมมิตใน Git `fix: resolve duplicate React keys and handle non-JSON API responses safely` เรียบร้อยแล้ว
 * **สถานะความคืบหน้า:** ระบบฝั่ง Frontend และโค้ดหลังบ้าน (Apps Script) ของโปรเจกต์ Dev พร้อมสำหรับการติดตั้งชีต (Phase A) และเริ่มการทดสอบการบันทึกข้อมูล (Phase D) แล้ว
+
 
