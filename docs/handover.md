@@ -84,14 +84,16 @@ sequenceDiagram
 
 ### 1. การคัดลอกฐานข้อมูลสเปรดชีต (Spreadsheet Setup)
 1. เข้าไปที่สเปรดชีตฐานข้อมูลต้นแบบแล้วทำการคัดลอกไฟล์ (File -> Make a copy)
-2. ตรวจสอบให้มั่นใจว่าภายในมีแท็บข้อมูล (Sheets) ครบ 7 แท็บหลักตามโครงสร้างนี้:
-   * `Master_Users`: บันทึกผู้ใช้และสิทธิ์ (`UserID`, `Email`, `FullName`, `Role`)
-   * `Master_Departments`: บันทึกข้อมูลแผนกและกลุ่มสายส่ง (`DeptID`, `DeptName`, `RouteGroup`, `Building`, `BudgetOwner`)
-   * `Master_Services`: บันทึกประเภทบริการไปรษณีย์ภายนอก (`ServiceID`, `ServiceName`)
-   * `Tx_Submissions`: เก็บประวัติการเดินรถรับเอกสารภายใน
-   * `Tx_Delegations`: เก็บข้อมูลและปริมาณไปรษณีย์ภัณฑ์ที่คัดแยก
-   * `Tx_Feedback`: เก็บประวัติการส่งมอบภายนอกและค่าบริการ
-   * `Tx_OTPStore`: ตารางลงทะเบียนเซสชันและรหัสผ่านชั่วคราว (OTP)
+  2. ตรวจสอบให้มั่นใจว่าภายในมีแท็บข้อมูล (Sheets) ครบ 8 แท็บหลักตามโครงสร้างนี้:
+     * `Master_Users`: บันทึกผู้ใช้และสิทธิ์ (`UserID`, `Email`, `FullName`, `Role`, `Status`)
+     * `Master_Departments`: บันทึกข้อมูลแผนกและกลุ่มสายส่ง (`DeptID`, `DeptName`, `RouteGroup`, `Building`, `Floor`, `BudgetOwner`)
+     * `Master_Services`: บันทึกประเภทบริการไปรษณีย์ภายนอก (`ServiceID`, `ServiceName`, `Description`)
+     * `System_Config`: ค่ากำหนดของระบบแบบไดนามิก (`Key`, `Value`, `Description`)
+     * `Tx_InternalRun`: เก็บประวัติการเดินรถรับเอกสารภายใน (`TxID`, `Timestamp`, `DeptName`, `Route`, `Round`, `ItemCount`, `Note`, `StaffEmail`)
+     * `Tx_InternalSort`: เก็บข้อมูลและปริมาณไปรษณีย์ภัณฑ์ที่คัดแยก (`TxID`, `Timestamp`, `DeptName`, `NormalCount`, `RegisterCount`, `PrivateCount`, `Total`, `Note`, `StaffEmail`)
+     * `Tx_ExternalPost`: เก็บประวัติการส่งมอบภายนอกและค่าบริการ (`TxID`, `Timestamp`, `RequestingDept`, `ServiceType`, `Cost`, `ItemCount`, `TrackingNo`, `FundSource`, `StaffEmail`)
+     * `Tx_OTPStore`: ตารางลงทะเบียนเซสชันและรหัสผ่านชั่วคราว (OTP)
+     * `Feedback_Reports`: เก็บประวัติรายงานปัญหาและข้อเสนอแนะ (`Timestamp`, `StaffEmail`, `FeedbackType`, `Severity`, `Description`)
 
 ### 2. การสร้าง Web App ผ่าน Google Apps Script
 1. เปิดสเปรดชีตที่คัดลอกขึ้นมา ไปที่เมนู **Extensions -> Apps Script**
