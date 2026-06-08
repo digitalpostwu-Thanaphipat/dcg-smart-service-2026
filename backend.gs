@@ -1,7 +1,7 @@
 // --- DCG Smart Track Backend (Production Grade) ---
 
 // [GGSheet Protocol] - ฐานข้อมูลหลัก (สามารถสลับไปดึงจาก Script Properties หรือใช้ ID สำรองเริ่มต้นนี้)
-var SPREADSHEET_ID = PropertiesService.getScriptProperties().getProperty("SPREADSHEET_ID") || "1AL0AHGleUZ1UmS2N3QAg3vM0z_E1ymJ8Eg9FfUneAD0";
+var SPREADSHEET_ID = PropertiesService.getScriptProperties().getProperty("SPREADSHEET_ID") || "";
 
 /**
  * ดักจับคำขอแบบ HTTP GET สำหรับเว็บบัญชีผู้ใช้งานภายนอก (ถ้ามี)
@@ -25,8 +25,8 @@ function doPost(e) {
   var result = {};
 
   try {
-    // [GGSheet Protocol] - ป้องกันการเขียนหรือลบข้อมูลโดยไม่ผ่านการยืนยันตัวตนจริง
-    if (action === 'saveBatch' || action === 'deleteLog' || action === 'feedback') {
+    // [GGSheet Protocol] - ป้องกันการเขียน อ่าน หรือลบข้อมูลโดยไม่ผ่านการยืนยันตัวตนจริง
+    if (action === 'saveBatch' || action === 'deleteLog' || action === 'feedback' || action === 'getMetaData' || action === 'searchLogs') {
       verifySessionToken(auth.sessionToken);
     }
 
@@ -365,6 +365,13 @@ function saveBatch(payload) {
     // บันทึกข้อมูลเป็น Batch รวดเดียวเพื่อประหยัดเวลา
     var lastRow = sheet.getLastRow();
     sheet.getRange(lastRow + 1, 1, rowsToWrite.length, currentHeaders.length).setValues(rowsToWrite);
+    
+    // ตั้งค่ารูปแบบคอลัมน์ Timestamp ให้แสดงเวลาด้วย
+    var timeColIdx = currentHeaders.indexOf("Timestamp");
+    if (timeColIdx !== -1) {
+      sheet.getRange(lastRow + 1, timeColIdx + 1, rowsToWrite.length, 1).setNumberFormat("yyyy-MM-dd HH:mm:ss");
+    }
+    
     SpreadsheetApp.flush();
     
     return { message: "บันทึกข้อมูลเรียบร้อยแล้ว (" + items.length + " รายการ)", txId: txId };
@@ -645,7 +652,7 @@ function publicSearch(payload) {
  * @param {string|null} sessionToken - รหัสโทเค็นเซสชันเข้าใช้งานระบบ
  * @param {Date|null} sessionExpires - วันเวลาหมดอายุของโทเค็นเซสชัน
  */
-function writeSessionRecord(sheet, email, otpCode, otpExpires, sessionToken, sessionExpires) {
+function writeSessionRecord(sheet, email, otpCode, otpExpires, sessionToken, sessionExpires, failedAttempts) {
   var dataRange = sheet.getDataRange();
   var values = dataRange.getValues();
   var headers = values[0];
@@ -655,6 +662,14 @@ function writeSessionRecord(sheet, email, otpCode, otpExpires, sessionToken, ses
   var otpExpiresIdx = headers.indexOf("OTPExpiresAt");
   var tokenIdx = headers.indexOf("SessionToken");
   var tokenExpiresIdx = headers.indexOf("SessionExpiresAt");
+  
+  // ตรวจสอบและสร้างคอลัมน์ FailedAttempts สำหรับเก็บจำนวนครั้งที่เข้าระบบผิดพลาด (Self-healing Header)
+  var failedAttemptsIdx = headers.indexOf("FailedAttempts");
+  if (failedAttemptsIdx === -1) {
+    failedAttemptsIdx = headers.length;
+    sheet.getRange(1, failedAttemptsIdx + 1).setValue("FailedAttempts");
+    headers.push("FailedAttempts");
+  }
   
   var foundRow = -1;
   for (var i = 1; i < values.length; i++) {
@@ -672,6 +687,7 @@ function writeSessionRecord(sheet, email, otpCode, otpExpires, sessionToken, ses
     newRow[otpExpiresIdx] = otpExpires;
     newRow[tokenIdx] = sessionToken;
     newRow[tokenExpiresIdx] = sessionExpires;
+    newRow[failedAttemptsIdx] = (failedAttempts !== undefined && failedAttempts !== null) ? failedAttempts : 0;
     sheet.appendRow(newRow);
   } else {
     // อัปเดตแถวที่มีอยู่
@@ -679,6 +695,9 @@ function writeSessionRecord(sheet, email, otpCode, otpExpires, sessionToken, ses
     if (otpExpires !== null) sheet.getRange(foundRow, otpExpiresIdx + 1).setValue(otpExpires);
     if (sessionToken !== null) sheet.getRange(foundRow, tokenIdx + 1).setValue(sessionToken);
     if (sessionExpires !== null) sheet.getRange(foundRow, tokenExpiresIdx + 1).setValue(sessionExpires);
+    if (failedAttempts !== undefined && failedAttempts !== null) {
+      sheet.getRange(foundRow, failedAttemptsIdx + 1).setValue(failedAttempts);
+    }
   }
 }
 
@@ -718,11 +737,26 @@ function requestOTP(payload) {
   var otpSheet = ss.getSheetByName("Tx_OTPStore");
   if (!otpSheet) {
     otpSheet = ss.insertSheet("Tx_OTPStore");
-    otpSheet.appendRow(["Email", "OTPCode", "OTPExpiresAt", "SessionToken", "SessionExpiresAt"]);
+    otpSheet.appendRow(["Email", "OTPCode", "OTPExpiresAt", "SessionToken", "SessionExpiresAt", "FailedAttempts"]);
+  } else {
+    // ตรวจสอบ Server Cooldown 60 วินาที เพื่อป้องกันการส่งรหัสพร่ำเพรื่อ (Rate Limiting)
+    var otpData = getSheetDataAsObjects(otpSheet);
+    var record = otpData.find(function(r) { return r.Email.toLowerCase() === email.toLowerCase(); });
+    if (record && record.OTPExpiresAt) {
+      var lastExpiresAt = new Date(record.OTPExpiresAt);
+      if (!isNaN(lastExpiresAt.getTime())) {
+        var lastRequestedAt = new Date(lastExpiresAt.getTime() - 15 * 60 * 1000);
+        var diffMs = now.getTime() - lastRequestedAt.getTime();
+        if (diffMs > 0 && diffMs < 60 * 1000) {
+          var secondsLeft = Math.ceil((60 * 1000 - diffMs) / 1000);
+          throw new Error("กรุณารออีก " + secondsLeft + " วินาทีก่อนขอรหัส OTP ใหม่ (Server Cooldown)");
+        }
+      }
+    }
   }
   
-  // บันทึกรหัส OTP ลงตาราง
-  writeSessionRecord(otpSheet, email, otpCode, otpExpires, "", new Date(0));
+  // บันทึกรหัส OTP ลงตาราง และรีเซ็ตจำนวนครั้งที่กรอกรหัสผิดกลับเป็น 0
+  writeSessionRecord(otpSheet, email, otpCode, otpExpires, "", new Date(0), 0);
   
   // 3. ส่งอีเมล OTP
   try {
@@ -766,9 +800,10 @@ function verifyOTP(payload) {
   
   var ss = getSpreadsheet();
   
+  var today = new Date();
+  
   // ตรวจสอบวันทำงาน (จันทร์-ศุกร์)
   if (shouldRestrictWorkdays(ss)) {
-    var today = new Date();
     var dayOfWeek = today.getDay(); // 0 = Sunday, 6 = Saturday
     if (dayOfWeek === 0 || dayOfWeek === 6) {
       throw new Error("ขออภัย ระบบจำกัดการเข้าใช้งานเฉพาะวันจันทร์ - ศุกร์ เท่านั้น");
@@ -789,7 +824,16 @@ function verifyOTP(payload) {
   
   // ตรวจสอบรหัสและอายุ
   if (String(record.OTPCode).trim() !== code) {
-    throw new Error("รหัส OTP ไม่ถูกต้อง กรุณาตรวจสอบและลองใหม่อีกครั้ง");
+    var currentFailed = Number(record.FailedAttempts || 0) + 1;
+    if (currentFailed >= 5) {
+      // เมื่อกรอกผิดเกิน 5 ครั้ง ให้ล้างรหัส OTP และแจ้งสิทธิ์การระงับทันทีเพื่อความปลอดภัย (Brute-Force Protection)
+      writeSessionRecord(otpSheet, email, "", new Date(0), null, null, 0);
+      throw new Error("รหัส OTP ถูกระงับเนื่องจากมีการกรอกผิดพลาดติดต่อกันเกิน 5 ครั้ง กรุณาร้องขอรหัสใหม่");
+    } else {
+      writeSessionRecord(otpSheet, email, null, null, null, null, currentFailed);
+      var attemptsLeft = 5 - currentFailed;
+      throw new Error("รหัส OTP ไม่ถูกต้อง (ระบุผิดเป็นครั้งที่ " + currentFailed + "/5 - เหลือโอกาสอีก " + attemptsLeft + " ครั้ง)");
+    }
   }
   
   var expiresAt = new Date(record.OTPExpiresAt);
@@ -811,7 +855,8 @@ function verifyOTP(payload) {
   var sessionExpires = new Date();
   sessionExpires.setHours(23, 59, 59, 999);
   
-  writeSessionRecord(otpSheet, email, null, null, sessionToken, sessionExpires);
+  // ล้างรหัส OTP เดิมออกจากชีทหลังตรวจสอบผ่านเพื่อป้องกันการนำรหัสเดิมกลับมาใช้ซ้ำ (OTP Reuse Prevention) และรีเซ็ตจำนวนการกรอกผิดเป็น 0
+  writeSessionRecord(otpSheet, email, "", new Date(0), sessionToken, sessionExpires, 0);
   
   return {
     email: userRecord.Email,
@@ -924,6 +969,14 @@ function handleFeedback(payload) {
     ];
 
     sheet.appendRow(rowData);
+    
+    // ตั้งค่ารูปแบบคอลัมน์ Timestamp ให้แสดงเวลาด้วย
+    var lastRow = sheet.getLastRow();
+    var timeColIdx = headers.indexOf("Timestamp");
+    if (timeColIdx !== -1) {
+      sheet.getRange(lastRow, timeColIdx + 1, 1, 1).setNumberFormat("yyyy-MM-dd HH:mm:ss");
+    }
+    
     SpreadsheetApp.flush();
 
     // Notify administrators if severity is High or Critical
@@ -987,22 +1040,24 @@ function getOrCreateBackupFolder() {
   var props = PropertiesService.getScriptProperties();
   var folderId = props.getProperty("BACKUP_FOLDER_ID");
   var folder;
+  var expectedFolderName = "Dcg Smart Service_Backup";
   
   if (folderId) {
     try {
       folder = DriveApp.getFolderById(folderId);
-      return folder;
+      if (folder.getName() === expectedFolderName) {
+        return folder;
+      }
     } catch (e) {
-      console.warn("Cached backup folder ID not found or inaccessible. Searching by name...");
+      console.warn("Cached backup folder ID not found, inaccessible, or has wrong name. Searching by name...");
     }
   }
   
-  var folderName = "WUS_Track_Backups";
-  var folders = DriveApp.getFoldersByName(folderName);
+  var folders = DriveApp.getFoldersByName(expectedFolderName);
   if (folders.hasNext()) {
     folder = folders.next();
   } else {
-    folder = DriveApp.createFolder(folderName);
+    folder = DriveApp.createFolder(expectedFolderName);
   }
   
   props.setProperty("BACKUP_FOLDER_ID", folder.getId());
@@ -1061,7 +1116,7 @@ function runAutoBackup() {
       throw new Error("HTTP " + response.getResponseCode() + ": " + response.getContentText());
     }
     
-    var backupBlob = response.getBlob().setName("WUS_Track_Backup_" + timestamp + ".xlsx");
+    var backupBlob = response.getBlob().setName("Dcg_Smart_Service_Backup_" + timestamp + ".xlsx");
     
     // 3. บันทึกลงโฟลเดอร์เฉพาะใน Google Drive
     var folder = getOrCreateBackupFolder();
@@ -1105,8 +1160,8 @@ function applyBackupRetention(folder) {
     var file = files.next();
     var name = file.getName();
     
-    // ตรวจสอบความปลอดภัยของชื่อไฟล์เพื่อป้องกันการลบข้อมูลสำคัญผิดพลาด
-    if (name.indexOf("WUS_Track_Backup_") === 0 && name.slice(-5) === ".xlsx") {
+    // ตรวจสอบความปลอดภัยของชื่อไฟล์เพื่อป้องกันการลบข้อมูลสำคัญผิดพลาด (รองรับทั้งชื่อเก่าและใหม่)
+    if ((name.indexOf("WUS_Track_Backup_") === 0 || name.indexOf("Dcg_Smart_Service_Backup_") === 0) && name.slice(-5) === ".xlsx") {
       if (file.getDateCreated() < cutoffDate) {
         file.setTrashed(true);
         deletedCount++;

@@ -6,6 +6,7 @@ import {
 } from '../lib/db';
 import { useAppStore } from '../store/useAppStore';
 import { LogItem } from '../types';
+import { toast } from 'sonner';
 
 export const syncEngine = {
   // Sync all pending logs from IndexedDB to the API
@@ -54,7 +55,7 @@ export const syncEngine = {
           store.logs.map(l => l.id === log.id ? { ...l, syncStatus: 'synced' } : l)
         );
         console.log(`SyncEngine: Log ${log.id} synced successfully.`);
-      } catch (e) {
+      } catch (e: any) {
         console.error(`SyncEngine: Failed to sync log ${log.id}:`, e);
         // Reset status to pending to retry later
         await updateLogStatus(log.id, 'pending');
@@ -65,6 +66,25 @@ export const syncEngine = {
         store.setLogs(
           store.logs.map(l => l.id === log.id ? { ...l, syncStatus: 'pending' } : l)
         );
+
+        // Check for session/authentication expired errors
+        const errMsg = e.message || '';
+        if (
+          errMsg.includes('เข้าสู่ระบบ') || 
+          errMsg.includes('หมดอายุ') || 
+          errMsg.includes('Session') || 
+          errMsg.includes('Authentication') || 
+          errMsg.includes('auth') ||
+          errMsg.includes('Unauthorized')
+        ) {
+          toast.error('สิทธิ์การใช้งานหมดอายุ กรุณาเข้าสู่ระบบใหม่อีกครั้งเพื่ออัปโหลดข้อมูล', {
+            description: 'ระบบตรวจพบว่าเซสชันเชื่อมต่อของคุณหมดอายุแล้ว',
+            duration: 6000
+          });
+          // Force logout to resolve desync
+          store.setCurrentUser(null);
+          store.setSessionToken(null);
+        }
       }
     }
   },

@@ -259,11 +259,26 @@ export const ReportPage: React.FC = () => {
       arr.reduce((acc, curr) => acc + (curr.cost || 0), 0);
     const runTotal = sum(runStats);
 
-    const dateLabel =
-      filters.dateMode === 'today' ? '(วันนี้)'
-      : filters.dateMode === 'month' ? '(เดือนนี้)'
-      : filters.dateMode === 'fiscal' ? '(ปีงบประมาณนี้)'
-      : '';
+    let dateLabel = '';
+    const now = new Date();
+    if (filters.dateMode === 'today') {
+      const formattedDate = now.toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
+      dateLabel = `(วันที่ ${formattedDate})`;
+    } else if (filters.dateMode === 'month') {
+      const formattedDate = now.toLocaleDateString('th-TH', { month: 'long', year: 'numeric' });
+      dateLabel = `(ประจำเดือน${formattedDate})`;
+    } else if (filters.dateMode === 'fiscal') {
+      const fiscalYear = now.getMonth() >= 9 ? now.getFullYear() + 543 + 1 : now.getFullYear() + 543;
+      dateLabel = `(ประจำปีงบประมาณ ${fiscalYear})`;
+    } else {
+      try {
+        const start = new Date(filters.startDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+        const end = new Date(filters.endDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+        dateLabel = `(วันที่ ${start} - ${end})`;
+      } catch (e) {
+        dateLabel = '';
+      }
+    }
 
     const text = `สรุปผลการดำเนินงาน ${dateLabel}
 

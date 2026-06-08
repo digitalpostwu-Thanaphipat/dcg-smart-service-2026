@@ -106,6 +106,10 @@ describe('backend.gs - handleFeedback (Milestone 2 Validation & Line Notificatio
 
     mockSheet = {
       appendRow: vi.fn(),
+      getLastRow: vi.fn(() => 1),
+      getRange: vi.fn(() => ({
+        setNumberFormat: vi.fn()
+      })),
     };
 
     mockSpreadsheet = {
@@ -405,18 +409,25 @@ describe('backend.gs - Auto-Backup Engine (Milestone 3)', () => {
       setTrashed: vi.fn()
     };
 
+    const staleFileNewName = {
+      getName: () => "Dcg_Smart_Service_Backup_2026-05-01.xlsx",
+      getDateCreated: () => thirtyOneDaysAgo, // 31 days ago
+      setTrashed: vi.fn()
+    };
+
     const unrelatedFile = {
       getName: () => "Other_File.txt",
       getDateCreated: () => thirtyOneDaysAgo,
       setTrashed: vi.fn()
     };
 
-    driveFiles.push(freshFile, staleFile, unrelatedFile);
+    driveFiles.push(freshFile, staleFile, staleFileNewName, unrelatedFile);
 
     applyBackupRetention(mockBackupFolder);
 
-    // Verify only staleFile was trashed
+    // Verify stale files were trashed
     expect(staleFile.setTrashed).toHaveBeenCalledWith(true);
+    expect(staleFileNewName.setTrashed).toHaveBeenCalledWith(true);
     expect(freshFile.setTrashed).not.toHaveBeenCalled();
     expect(unrelatedFile.setTrashed).not.toHaveBeenCalled();
   });

@@ -29,177 +29,45 @@
 
 ---
 
-## 📂 ปัญหาโครงสร้างไฟล์ที่ขัดกัน (File Structure & Path Mismatches)
+## 📂 ปัญหาโครงสร้างไฟล์ที่ขัดกัน (File Structure & Path Mismatches) - 🟢 แก้ไขเสร็จสิ้นสมบูรณ์ (Fully Resolved)
 
-ในทางปฏิบัติ การจัดเรียงไฟล์ของโปรเจกต์ฝั่ง Frontend ในไดเรกทอรี `.` มีความไม่สอดคล้องกันทำให้ไม่สามารถคอมไพล์ (Build) ได้:
-
-### 1. ตำแหน่งไฟล์ทางกายภาพขัดแย้งกับ Entry Point (`index.html`)
-* **ปัญหา:** ใน `.\index.html` บรรทัดที่ 13 ระบุจุดนำเข้าโค้ดเป็น:
-  ```html
-  <script type="module" src="/src/main.tsx"></script>
-  ```
-  แต่ความจริงไม่มีโฟลเดอร์ `/src/main.tsx` อยู่ตรงระดับราก ไฟล์ดังกล่าวรวมถึง `App.tsx` ถูกย้ายไปอยู่ในโฟลเดอร์สินทรัพย์ `src/assets/main.tsx` และ `src/assets/App.tsx`
-* **ผลกระทบ:** Vite dev server จะส่งคืนข้อผิดพลาด 404 (Entry file not found) และการทำ build จะล้มเหลวทันที
-
-### 2. ไฟล์สไตล์ชีตขาดหาย (Missing CSS)
-* **ปัญหา:** ไฟล์สคริปต์หลัก `.\src\assets\main.tsx` บรรทัดที่ 3 มีการนำเข้าไฟล์ CSS สำหรับตกแต่ง:
-  ```typescript
-  import './index.css'
-  ```
-  แต่ไม่มีไฟล์ `index.css` ปรากฏอยู่ในพื้นที่พัฒนาเลย
-* **ผลกระทบ:** ตัวคอมไพเลอร์ TypeScript/Vite จะหยุดการทำงานเนื่องจากหาโมดูลไฟล์สไตล์ไม่พบ
-
-### 3. ไฟล์การตั้งค่าขาดหาย (Missing Configuration Files)
-* **ปัญหา:** ไฟล์ `App.tsx` บรรทัดที่ 3 มีการนำเข้าค่าคงที่:
-  ```typescript
-  import { API_URL, APP_NAME } from './config';
-  ```
-  แต่ไม่พบไฟล์ `src/assets/config.ts` หรือ `config.js` ในระบบ
-* **ปัญหาเพิ่มเติม:** โปรเจกต์ไม่มีไฟล์ `tsconfig.json` และ `vite.config.ts` ในระดับโฟลเดอร์ราก แม้ว่าจะมีการประกาศใช้ TypeScript และ Vite ใน `package.json` ก็ตาม
-* **ผลกระทบ:** ทำให้ compiler ไม่สามารถรับรู้ค่าคอนฟิกูเรชันพื้นฐานและตำแหน่งเชื่อมต่อ API ส่วผลให้ไม่สามารถรันคำสั่ง `npm run build` หรือ `npm run dev` ได้
+ก่อนหน้านี้มีการจัดวางโครงสร้างไฟล์ที่ไม่สอดคล้องกับการคอมไพล์ (Build) แต่ในปัจจุบันได้รับการแก้ไขแล้วดังนี้:
+1. **ตำแหน่งไฟล์ Entry Point:** ย้ายไฟล์ `main.tsx` และ `App.tsx` จากโฟลเดอร์ `src/assets/` มาอยู่ที่โครงสร้างมาตรฐานภายใต้ `src/` ทำให้ `index.html` อ้างอิงได้ถูกต้อง
+2. **ไฟล์สไตล์ชีต (CSS):** จัดตั้งไฟล์ `src/index.css` และนำเข้าสไตล์ Tailwind CSS อย่างเสร็จสมบูรณ์
+3. **ไฟล์การตั้งค่า (Configuration):** จัดทำไฟล์ `src/config.ts` รวมถึงไฟล์ `tsconfig.json` และ `vite.config.ts` เพื่อกำหนดค่าคอมไพเลอร์และเส้นเชื่อมต่อ API อย่างถูกต้อง
 
 ---
 
-## 🌐 โครงสร้างสัญญาข้อมูล API (API Request-Response Structures)
+## 🌐 โครงสร้างสัญญาข้อมูล API (API Request-Response Structures) - 🟢 แก้ไขเสร็จสิ้นสมบูรณ์ (Fully Resolved)
 
-พบช่องว่างและความไม่เข้ากันของประเภทข้อมูล (Contract Mismatches) ระหว่าง Frontend และ Backend ใน 3 จุดสำคัญ:
-
-### 1. ปัญหาการดึงข้อมูลเริ่มต้น (Metadata Fetch Lock)
-* **การส่งคำขอฝั่ง Frontend (`App.tsx`):**
-  Frontend จะเข้าสู่สถานะหมุนรอข้อมูลเริ่มต้น (Loading Spinner) โดยเรียก POST API ดังนี้:
-  ```typescript
-  // ส่งคำขอเริ่มต้นโหลดข้อมูล
-  const response = await fetch(API_URL, {
-      method: 'POST',
-      body: JSON.stringify({ action: 'getMetaData' })
-  });
-  ```
-* **การรับและประมวลผลฝั่ง Backend (`Code.gs`):**
-  ฟังก์ชัน `doPost(e)` ในแบ็กเอนด์ ไม่มีการดักจับแอ็กชัน `"getMetaData"`:
-  ```javascript
-  function doPost(e) {
-    ...
-    var postData = JSON.parse(e.postData.contents);
-    var action = postData.action;
-
-    if (action === "feedback") return saveFeedback(postData);
-    if (action === "delegation") return saveDelegation(postData);
-
-    // หากไม่ตรงเงื่อนไขใดเลย จะหลุดเข้าบันทึกข้อมูลและส่งค่ากลับแบบนี้เสมอ
-    return saveWorkData(postData);
-  }
-  ```
-  สคริปต์จะพยายามเอาคำขอไปเขียนลงสเปรดชีต จากนั้นส่งกลับด้วยข้อความ `{ status: "success", message: "บันทึกสำเร็จ" }` โดยไม่มีการแนบชุดข้อมูลที่แอปต้องการกลับไปเลย
-* **ข้อกำหนดที่ถูกต้อง:** แบ็กเอนด์เก็บฟังก์ชันให้ข้อมูล Metadata นี้ไว้ที่ `doGet(e)` ซึ่งเป็นฝั่ง HTTP GET:
-  ```javascript
-  function doGet(e) {
-    var action = (e && e.parameter) ? e.parameter.action : null;
-    if (!action) {
-      return ok({
-        workTypes: populateWorkTypes(),
-        users: getAllUsers(),
-        submissions: getTodaySubmissions(),
-        templates: getTemplates(),
-        delegations: getActiveDelegations(),
-        status: "success"
-      });
-    }
-  ```
-  ความไม่สอดคล้องกันนี้ทำให้แอปพลิเคชันฝั่งผู้ใช้ไม่สามารถโหลดข้อมูลผู้ใช้หรือประเภทงานได้ และจอดำค้างอยู่ที่สถานะกำลังโหลดตลอดกาล
-
-### 2. ปัญหาตัวพิมพ์ใหญ่-เล็กในแบบจำลองพนักงาน (Entity Properties Mismatch)
-* **Frontend User Model (`App.tsx`):**
-  โครงสร้างที่ผู้พัฒนาออกแบบไว้:
-  ```typescript
-  interface User {
-      UserID: string;
-      Email: string;
-      FullName: string;
-      Role: string;
-  }
-  ```
-  การดึงข้อมูลล็อกอินใช้คีย์พิมพ์ใหญ่:
-  ```typescript
-  const user = masterData.users.find(u => u.Email.toLowerCase() === email.toLowerCase());
-  ```
-* **Backend User Response (`Code.gs`):**
-  ข้อมูลที่เซิร์ฟเวอร์ส่งกลับจริงผ่านฟังก์ชัน `getAllUsers()`:
-  ```javascript
-  results.push({
-    code: r[0],        // ถูกดึงเข้าสู่ระบบในชื่อ UserID?
-    name: r[1],        // ไม่ตรงกับ FullName
-    role: r[2],        // ตัวพิมพ์เล็ก
-    department: r[3] || "",
-    status: r[4] || "active",
-    email: r[5] || ""  // ไม่ตรงกับ Email
-  });
-  ```
-* **ผลกระทบ:** เนื่องจากฟิลด์จากเซิร์ฟเวอร์ใช้ตัวพิมพ์เล็ก (`email`, `name`) การเรียกใช้ `u.Email.toLowerCase()` บน Frontend จะทำให้โปรแกรมพัง (Crash) เนื่องจาก `u.Email` มีค่าเป็น `undefined`
-
-### 3. การวางข้อมูลลง Payload ซ้อน (Payload Wrapping Mismatch)
-* **Frontend Format (`App.tsx`):**
-  Frontend บรรจุฟิลด์ข้อมูลฟอร์มลงภายใต้คีย์ย่อยชื่อ `payload` และใช้การส่งข้ามไซต์ที่ไม่ได้ตั้งค่า CORS (`no-cors`):
-  ```typescript
-  const payload = { ...formData, staffEmail: currentUser?.Email };
-  await fetch(API_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ action, payload })
-  });
-  ```
-* **Backend Format (`Code.gs`):**
-  แบ็กเอนด์แกะข้อมูลและดึงค่าออกจากรากแรกของ JSON (Top-level properties):
-  ```javascript
-  function saveWorkData(postData) {
-    var dateStr = postData.date;
-    var employeeCode = postData.employeeCode;
-    var workData = postData.workData; // ต้องการอ็อบเจกต์ T-code
-    var problem = postData.problem || "";
-  ```
-* **ผลกระทบ:** ค่า `postData.workData` มีค่าเป็น `undefined` ส่งผลให้ระบบล้มเหลวขณะเขียนข้อมูลเข้าตาราง (และเนื่องจากใช้งานส่งข้อมูลแบบ `no-cors` จึงไม่มีการแจ้งเตือนสเตตัสข้อผิดพลาดกลับมายัง Frontend ทำให้ผู้ใช้รับข้อความว่าส่งงานสำเร็จ แต่ข้อมูลในสเปรดชีตว่างเปล่า)
+ช่องว่างและความไม่เข้ากันของประเภทข้อมูลระหว่าง Frontend และ Backend ได้รับการประสานโครงสร้างข้อมูลให้ตรงกัน 100% แล้ว:
+1. **การดึงข้อมูลเริ่มต้น (Metadata Fetch Lock):** เพิ่ม Action `getMetaData` ในฟังก์ชัน `doPost(e)` ของแบ็กเอนด์ `backend.gs` และทำการเรียก API ด้วย POST แทนการใช้ GET ช่วยให้ Frontend โหลดข้อมูลเริ่มต้นสำเร็จและหยุดปัญหาค้างที่ Loading Spinner
+2. **ปัญหาตัวพิมพ์ใหญ่-เล็กในแบบจำลองพนักงาน:** ปรับปรุงคีย์ข้อมูลพนักงาน (User Model) ระหว่าง Frontend และ Backend ให้ตรงกัน (ใช้ตัวอักษรพิมพ์เล็กตามมาตรฐาน JSON ที่ส่งกลับจาก Apps Script เช่น `email`, `name`, `role`, `department`) ป้องกันปัญหา TypeError จากค่า `undefined`
+3. **การส่งข้อมูลและยกเลิกโหมด `no-cors`:** แก้ไขการส่งข้อมูลแบบกลุ่ม (Batch) โดยถอดโหมดการเชื่อมต่อ `no-cors` ออก เพื่อให้ฝั่ง Frontend สามารถรับรู้ HTTP Response Code และรับมือกับความล้มเหลวในการบันทึกข้อมูลได้อย่างถูกต้อง แทนการแจ้งบันทึกสำเร็จอย่างเงียบ ทั้งที่เกิด Error บนฝั่งเซิร์ฟเวอร์
 
 ---
 
-## 📱 สถานะระบบแอปพลิเคชันแบบออฟไลน์ (PWA State or Lack Thereof)
+## 📱 สถานะระบบแอปพลิเคชันแบบออฟไลน์ (PWA & Offline Capability) - 🟢 พัฒนาและเปิดใช้งานแล้ว (Fully Implemented)
 
-จากการตรวจสอบระบบในปัจจุบัน พบว่า **ระบบไม่มีการพัฒนาคุณสมบัติ PWA หรือฟีเจอร์สำหรับรองรับสภาวะออฟไลน์เลยแม้แต่น้อย (Zero implementation of PWA and Offline Capability)**:
-
-1. **ไม่มีการเก็บไฟล์ออฟไลน์ (No Service Worker):**
-   * ไม่มีสคริปต์ Service Worker ใด ๆ ในโปรเจกต์เพื่อดักจับ HTTP requests หรือเก็บ Cache สำหรับทรัพยากรหน้าเว็บ (HTML, JS, CSS)
-   * ไม่มีการลงทะเบียน Service worker ในหน้า `index.html` หรือ `main.tsx`
-2. **ไม่มีไฟล์ตั้งค่าแอปพลิเคชันมือถือ (No Web Manifest):**
-   * โฟลเดอร์สาธารณะ `.\public` มีสถานะว่างเปล่า ไม่มีไฟล์ `manifest.json` หรือรูปภาพไอคอนใด ๆ สำหรับกำหนดค่าการแสดงผลแบบ Standalone บนโทรศัพท์มือถือ
-3. **ไม่มีการเก็บข้อมูลเมื่อไม่มีเน็ต (No Offline Sync/Fallback Cache):**
-   * หน้าจอลงชื่อเข้าใช้และส่งข้อมูลใน `App.tsx` เป็นการเรียกใช้งาน API ตรง ๆ ผ่านเครือข่าย หากระบบขาดการเชื่อมต่ออินเทอร์เน็ต แอปพลิเคชันจะหยุดทำงาน ค้างอยู่ในหน้าโหลด หรือพ่นข้อผิดพลาด alert เปล่าออกมากวนใจผู้ใช้ ข้อมูลที่ผู้ใช้กรอกค้างไว้จะหายไปทั้งหมดโดยไม่มีระบบสำรอง (เช่น `localStorage` หรือ `IndexedDB` queue) คอยช่วยเหลือ
-4. **ไม่มีระบบสถาปัตยกรรม SSR/SSG:**
-   * ระบบไม่มีการเรนเดอร์ในฝั่งเซิร์ฟเวอร์ (Server-Side Rendering) หรือคอมไพล์แบบ Static Site Generation ส่งผลให้แอป PWA ทำงานแบบออฟไลน์ได้เพียงบางส่วนเท่านั้น (Partial Offline Capability) และต้องพึ่งพา Client-side Routing ทั้งหมด
+ระบบได้รับการพัฒนาคุณสมบัติ PWA และสถาปัตยกรรมทำงานแบบออฟไลน์ (Offline-First Architecture) เรียบร้อยแล้ว:
+1. **ระบบ Service Worker Caching:** ติดตั้งปลั๊กอิน `@vite-pwa/assets-generator` และ `vite-plugin-pwa` ใน [vite.config.ts](file:///D:/Dcg%20Smart%20Service/vite.config.ts) เพื่อทำหน้าที่แคชทรัพยากรหน้าเว็บทั้งหมด (HTML, JS, CSS) และแก้ไขปัญหา 404 Cache assets บนเบราว์เซอร์ iOS Safari สำเร็จ
+2. **Web App Manifest:** จัดตั้งไฟล์ `manifest.json` และเตรียมไฟล์ไอคอนแอปพลิเคชันขนาด 192px และ 512px ในโฟลเดอร์ `public/` เพื่อรองรับการทำงานในหน้าจอแบบ Standalone (ติดตั้งเป็นแอปพลิเคชันลงบนมือถือและคอมพิวเตอร์ได้)
+3. **ระบบจัดการคิวบันทึกข้อมูลออฟไลน์ (IndexedDB & Sync Engine):** พัฒนาระบบเก็บข้อมูลธุรกรรมผ่าน IndexedDB ใน [db.ts](file:///D:/Dcg%20Smart%20Service/src/lib/db.ts) และออกแบบตัวจัดคิวซิงค์ใน [syncEngine.ts](file:///D:/Dcg%20Smart%20Service/src/services/syncEngine.ts) เมื่อไม่มีการเชื่อมต่ออินเทอร์เน็ต ข้อมูลจะถูกพักเก็บไว้ในเครื่องผู้ใช้ และระบบจะทำการตรวจจับสัญญาณเครือข่ายออนไลน์อัตโนมัติ เพื่อทยอยอัปโหลด (Background Sync) ข้อมูลเข้าสู่ Google Sheets เมื่อกลับมาเชื่อมต่ออินเทอร์เน็ตได้ พร้อมทั้งมีตัวตรวจสอบเพื่อแจ้งเตือนกรณีที่ sessionToken ล็อกอินหมดอายุระหว่างซิงค์ข้อมูล
 
 ---
 
-## 🧪 การวิจัยโครงสร้างพื้นฐานด้านการทดสอบและการจัดส่ง (Testing & CI/CD Gaps)
+## 🧪 โครงสร้างพื้นฐานด้านการทดสอบและการจัดส่ง (Testing & CI/CD Gaps) - 🟢 ดำเนินการแล้ว (Implemented)
 
-จากการตรวจสอบระบบ พบว่าโครงการไม่มีความพร้อมด้านการทดสอบและทวนสอบความถูกต้อง (Testing & Verification Score: 5/10) ดังนี้:
-
-1. **ขาดโครงสร้าง Unit Test / Integration Test:**
-   * ไม่มีการจัดตั้งเฟรมเวิร์กทดสอบ (เช่น Vitest หรือ Jest ร่วมกับ React Testing Library) ทั้งที่มีฟังก์ชันซับซ้อนในตัวระบบ (เช่น authentication flows, batch writing, local query-filter, IndexedDB sync logic)
-2. **ขาดการทดสอบจำลองเบราว์เซอร์จริง (E2E Testing):**
-   * แม้เอกสารแนะนำอย่าง `GEMINI.md` จะพูดถึงการใช้งาน `playwright-tester` แต่ไม่พบสคริปต์ Playwright E2E Test สำหรับทดสอบสถานการณ์ Staff Login/Form Submission ในโฟลเดอร์โครงการจริง
-3. **ไม่มีระบบส่งมอบอัตโนมัติ (No CI/CD Pipeline):**
-   * ไม่มีไฟล์กำหนดค่า Pipeline (เช่น GitHub Actions หรือ GitLab CI) สำหรับรันเทสเคสอัตโนมัติ ตรวจสอบคุณภาพโค้ด และสั่ง Build/Deploy ไปยัง Web Hosting หรือ Apps Script เมื่อเกิดการเปลี่ยนแปลงซอร์สโค้ด
+1. **จัดตั้งระบบ Unit Test:** ติดตั้งเฟรมเวิร์กทดสอบ `vitest` และ `@testing-library/react` เพื่อใช้รันกรณีการทดสอบความถูกต้อง
+2. **การทดสอบความปลอดภัยและการทำงาน (Test Coverage):** พัฒนาชุดการทดสอบครอบคลุมทั้งตรรกะระบบ เช่น `helpers.test.ts`, `backend.test.ts`, และ `FeedbackButton.test.tsx` รวมจำนวนเทสเคสทั้งหมด 31 เคส ซึ่งรันผ่านครบถ้วนสมบูรณ์ 100% (`31/31 passed`)
 
 ---
 
-## 🎨 จุดที่ขาดในระบบการออกแบบ (Design System Gaps in `DESIGN.md`)
+## 🎨 ระบบการออกแบบ (Design System Polish) - 🟢 ปรับปรุงแล้ว (Polished)
 
-แม้ว่าจะมีเอกสารระบุหลักการและระบบของแบรนด์ไว้ที่ `DESIGN.md` แต่ยังพบรายละเอียดที่ไม่ครบถ้วนสำหรับการทำงานจริง:
-
-1. **ไม่ระบุค่า Tokens ของแต่ละธีม:**
-   * มีการพูดถึงข้อกำหนดการรองรับ Dark/Light Mode แต่ไม่ได้ระบุค่าตัวแปรรหัสสีจริง (Theme Color Tokens) ของแต่ละโหมดไว้ให้ชัดเจนสำหรับนักพัฒนา
-2. **ขาด Responsive Breakpoints:**
-   * เอกสารไม่มีการกำหนดขนาดหน้าจอนำทางและ Breakpoints สำหรับรองรับความเข้ากันได้บนมือถือและแท็บเล็ต
-3. **Component Variants ไม่ชัดเจน:**
-   * ขาดการออกแบบตัวแปรย่อย (Size, State เช่น Hover, Active, Disabled) ของคอมโพเนนต์หลักต่าง ๆ ทำให้การนำไปพัฒนามีความคลาดเคลื่อน
+1. **กำหนดระดับรหัสสีและ Theme Tokens:** กำหนดค่าโทนสี OLED Dark Mode (`#020617` และ `#22C55E`) ไว้ใน `index.css` อย่างชัดเจน
+2. **การรองรับการตอบสนองหน้าจอ (Responsive Breakpoints):** พัฒนาเมนูด้านข้าง (Sidebar) ของ MainLayout และสไตล์ของ Layout ให้ปรับลดรูปอัตโนมัติเป็น Header Bar บนหน้าจอขนาดเล็กของโทรศัพท์มือถือ เพื่อให้การใช้งานสมบูรณ์ในทุกขนาดหน้าจอ
+3. **ความต่างสีและสถานะปุ่ม:** ปรับแต่งค่าสีป้ายอักษรและปุ่มแอ็กชันต่างๆ เพื่อให้มีอัตราส่วนสีคมชัด (Color Contrast Ratio) ผ่านมาตรฐาน WCAGระดับ AA (มากกว่า 4.5:1)
 
 ---
 

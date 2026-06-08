@@ -116,7 +116,7 @@
     * เขียน Unit Test ใน `FeedbackButton.test.tsx`
     * ผ่าน Forensic Audit (CLEAN verdict)
   * **[Auto-Backup Engine — ✅ เสร็จสมบูรณ์]:**
-    * พัฒนา `runAutoBackup()` — Export 3 ชีทธุรกรรมเป็น .xlsx ไปยัง Google Drive `WUS_Track_Backups/`
+    * พัฒนา `runAutoBackup()` — Export 3 ชีทธุรกรรมเป็น .xlsx ไปยัง Google Drive `Dcg Smart Service_Backup/`
     * พัฒนา `applyBackupRetention()` — Retention Policy 30 วัน
     * พัฒนา `setupDailyBackupTrigger()` — Time-driven trigger ทุกวัน 02:00 น. (Asia/Bangkok)
     * ผ่าน Forensic Audit (CLEAN verdict)
@@ -175,8 +175,20 @@
     * ดำเนินการเพิ่มคำอธิบายฟังก์ชันรูปแบบ JSDoc ให้กับฟังก์ชันหลังบ้านทั้งหมดใน [backend.gs](file:///D:/[DEV] __WUS_Track_DB/backend.gs) เพื่อระบุประเภทข้อมูลพารามิเตอร์ ผลลัพธ์ และรายละเอียดการทำงานอย่างชัดเจน ช่วยสนับสนุนการส่งมอบระบบ (Handover) และการสืบค้นโค้ดในตัว IDE ของ Apps Script
     * คอมมิตเก็บประวัติบน Git เรียบร้อยแล้ว
   * **[Auto-Backup Verification — ✅ สำรองข้อมูลสำเร็จ]:**
-    * ผู้ใช้รันฟังก์ชันทดสอบการสำรองข้อมูลรายวันในระบบจริง (Manual Run) สำเร็จ ได้รับไฟล์สำรองข้อมูลธุรกรรม `WUS_Track_Backup_2026-06-05_133636.xlsx` ลง Google Drive โฟลเดอร์ `WUS_Track_Backups` ยืนยันว่าระบบเชื่อมต่อ DriveApp และสิทธิ์ต่าง ๆ สมบูรณ์พร้อมใช้งาน
+    * ผู้ใช้รันฟังก์ชันทดสอบการสำรองข้อมูลรายวันในระบบจริง (Manual Run) สำเร็จ ได้รับไฟล์สำรองข้อมูลธุรกรรม `Dcg_Smart_Service_Backup_2026-06-05_133636.xlsx` ลง Google Drive โฟลเดอร์ `Dcg Smart Service_Backup` ยืนยันว่าระบบเชื่อมต่อ DriveApp และสิทธิ์ต่าง ๆ สมบูรณ์พร้อมใช้งาน
 * **สถานะความคืบหน้า:** ดำเนินการย้ายข้อมูลประวัติธุรกรรมทั้งหมด ปรับแต่งคำอธิบายโค้ด (Annotations) และทดสอบรันแบคอัพหลังบ้านสำเร็จสมบูรณ์ ระบบมีความพร้อมเต็มตัวในฝั่งฐานข้อมูล
+
+---
+
+### 📌 เฟสที่ 9: การตรวจสอบโค้ดและปรับปรุงเอกสารวิกิให้สอดคล้องกัน (Code Audit & Documentation Sync)
+* **ช่วงเวลา:** 8 มิถุนายน 2569
+* **การดำเนินการแก้ไข:**
+  * **[Documentation Update]:** ปรับปรุงรายงาน `evaluation_report.md` ในส่วนของตารางคะแนน (Score Card) ให้สะท้อนค่าจริงของการแก้ไข และย้ายประเด็นจากหมวดข้อบกพร่อง (Weaknesses) ไปเป็นสถานะแก้ไขเสร็จสิ้นสมบูรณ์ (Resolved)
+  * **[Security & WCAG Documentation Sync]:** ทำการอัปเดตเอกสาร `docs/vulnerabilities.md` และ `docs/wcag.md` โดยระบุสถานะและแนวทางการแก้ไขจริงที่ได้ดำเนินการลงไปในโค้ดของแต่ละหัวข้อ (SEC-01 ถึง SEC-09 และข้อกำหนดความเหลื่อมล้ำในการใช้งานทั่วไป)
+  * **[Source Code Inspection & Audit]:** ตรวจสอบโค้ดจริงในโครงการเพื่อยืนยันความปลอดภัยและความถูกต้อง ได้แก่ ฟังก์ชัน OTP Expire Hoisting/OTP Reuse ใน `backend.gs`, โครงสร้างการหยุดกระจายสัญญาณ Event Bubbling บนคีย์บอร์ดใน `RunPage.tsx`, และโครงสร้าง Focus Trap/ARIA attributes ใน `ReceiptModal.tsx`
+  * **[DOM Sync for Tabpanel]:** ทำการปรับแก้ไข `src/App.tsx` เพื่อห่อหุ้มคอมโพเนนต์เนื้อหาในแต่ละหน้าด้วยแท็ก `div` ที่มี `role="tabpanel"`, `id={`panel-${activeTab}`}`, และ `aria-labelledby` เพื่อแก้ไขข้อบกพร่อง `aria-controls` ไม่สอดคล้องกับโครงสร้าง DOM ของเบราว์เซอร์
+  * **[Build & Test Verification]:** ทวนสอบระบบผ่านคำสั่ง `npm run test` ยืนยันผลการทดสอบ Unit Tests ผ่านทั้งหมด 100% (31/31 เคส) และ `npm run build` ฝั่งไคลเอนต์คอมไพล์สำเร็จไม่มีข้อผิดพลาด
+
 
 
 

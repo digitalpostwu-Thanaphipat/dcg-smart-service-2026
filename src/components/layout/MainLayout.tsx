@@ -20,6 +20,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const { 
     currentUser, 
     setCurrentUser, 
+    setSessionToken,
     activeTab, 
     setActiveTab, 
     status, 
@@ -95,8 +96,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
   const handleLogout = () => {
     setCurrentUser(null);
+    setSessionToken(null);
     sessionStorage.removeItem('google_id_token');
-    sessionStorage.removeItem('dcg_session_token');
   };
 
   const runProgress = Math.min(100, Math.round((todayStats.run / 50) * 100));

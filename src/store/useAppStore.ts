@@ -6,6 +6,8 @@ interface AppState {
   // --- Auth & User ---
   currentUser: User | null;
   setCurrentUser: (user: User | null) => void;
+  sessionToken: string | null;
+  setSessionToken: (token: string | null) => void;
   theme: 'light' | 'dark';
   setTheme: (theme: 'light' | 'dark') => void;
   
@@ -53,6 +55,8 @@ export const useAppStore = create<AppState>()(
     (set) => ({
       currentUser: null,
       setCurrentUser: (user) => set({ currentUser: user }),
+      sessionToken: null,
+      setSessionToken: (token) => set({ sessionToken: token }),
       theme: (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light',
       setTheme: (theme) => set({ theme }),
       
@@ -106,6 +110,7 @@ export const useAppStore = create<AppState>()(
       name: 'wus-track-storage',
       partialize: (state) => ({ 
         currentUser: state.currentUser,
+        sessionToken: state.sessionToken,
         recentDepts: state.recentDepts,
         activeTab: state.activeTab,
         filters: state.filters,

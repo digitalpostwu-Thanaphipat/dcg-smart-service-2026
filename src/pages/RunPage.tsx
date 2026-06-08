@@ -143,6 +143,7 @@ export const RunPage: React.FC = () => {
                     <div 
                       className="flex items-center gap-1 bg-white/80 dark:bg-slate-900/80 border border-slate-200 dark:border-blue-500/20 rounded-2xl p-1 shadow-sm"
                       onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => e.stopPropagation()}
                     >
                       <button
                         type="button"

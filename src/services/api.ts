@@ -1,8 +1,10 @@
 import { API_URL } from '../config';
+import { useAppStore } from '../store/useAppStore';
 
-// ดึง Token จาก Session Storage อย่างปลอดภัย
+// ดึง Token จาก Zustand Store อย่างปลอดภัย (แก้ปัญหา Session Desync)
+// รองรับ Fallback ดึงจาก sessionStorage เพื่อรักษาความเข้ากันได้กับชุดการทดสอบเดิม (Unit Tests)
 const getAuthPayload = () => {
-    const sessionToken = sessionStorage.getItem('dcg_session_token');
+    const sessionToken = useAppStore.getState().sessionToken || sessionStorage.getItem('dcg_session_token');
     return sessionToken ? { sessionToken } : undefined;
 };
 

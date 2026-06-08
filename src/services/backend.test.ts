@@ -31,8 +31,8 @@ function applyBackupRetention(folder: any, retentionDays = 30) {
     const file = files.next();
     const name = file.getName();
     
-    // ตรวจสอบความปลอดภัยของชื่อไฟล์เพื่อป้องกันการลบข้อมูลสำคัญผิดพลาด
-    if (name.indexOf("WUS_Track_Backup_") === 0 && name.slice(-5) === ".xlsx") {
+    // ตรวจสอบความปลอดภัยของชื่อไฟล์เพื่อป้องกันการลบข้อมูลสำคัญผิดพลาด (รองรับทั้งชื่อเก่าและใหม่)
+    if ((name.indexOf("WUS_Track_Backup_") === 0 || name.indexOf("Dcg_Smart_Service_Backup_") === 0) && name.slice(-5) === ".xlsx") {
       if (file.getDateCreated() < cutoffDate) {
         file.setTrashed(true);
         deletedCount++;
@@ -89,6 +89,14 @@ describe('backend.gs - applyBackupRetention (Retention Policy)', () => {
         setTrashed(val: boolean) { this.trashed = val; }
       },
       {
+        name: "Dcg_Smart_Service_Backup_2026-05-01_120000.xlsx",
+        createdDate: oldDate,
+        trashed: false,
+        getName() { return this.name; },
+        getDateCreated() { return this.createdDate; },
+        setTrashed(val: boolean) { this.trashed = val; }
+      },
+      {
         name: "WUS_Track_Backup_2026-05-25_120000.xlsx",
         createdDate: newDate,
         trashed: false,
@@ -116,9 +124,10 @@ describe('backend.gs - applyBackupRetention (Retention Policy)', () => {
 
     const deleted = applyBackupRetention(folderMock);
 
-    expect(deleted).toBe(1);
-    expect(filesList[0].trashed).toBe(true);  // Older than 30 days, matching pattern -> trashed
-    expect(filesList[1].trashed).toBe(false); // Newer than 30 days -> preserved
-    expect(filesList[2].trashed).toBe(false); // Older than 30 days, but non-matching name -> preserved
+    expect(deleted).toBe(2);
+    expect(filesList[0].trashed).toBe(true);  // Older than 30 days, old pattern -> trashed
+    expect(filesList[1].trashed).toBe(true);  // Older than 30 days, new pattern -> trashed
+    expect(filesList[2].trashed).toBe(false); // Newer than 30 days -> preserved
+    expect(filesList[3].trashed).toBe(false); // Older than 30 days, but non-matching name -> preserved
   });
 });

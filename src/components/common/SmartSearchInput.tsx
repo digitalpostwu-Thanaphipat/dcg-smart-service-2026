@@ -16,6 +16,7 @@ interface SmartSearchInputProps {
 
 const SmartSearchInput = ({ id, value, onChange, placeholder, departments, recentDepts, onRecentClick, themeColor }: SmartSearchInputProps) => {
     const [showSuggestions, setShowSuggestions] = useState(false);
+    const [activeIndex, setActiveIndex] = useState(-1);
     const wrapperRef = useRef<HTMLDivElement>(null);
 
     const colorClasses = themeColor.includes('emerald')
@@ -49,6 +50,11 @@ const SmartSearchInput = ({ id, value, onChange, placeholder, departments, recen
         ).slice(0, 50);
     }, [departments, value]);
 
+    // Reset active index when suggestions list changes or closes
+    useEffect(() => {
+        setActiveIndex(-1);
+    }, [filteredDepts, showSuggestions]);
+
     return (
         <div className="relative" ref={wrapperRef}>
             {recentDepts && recentDepts.length > 0 && onRecentClick && (
@@ -68,25 +74,36 @@ const SmartSearchInput = ({ id, value, onChange, placeholder, departments, recen
                     onChange={e => { onChange(e.target.value); setShowSuggestions(true); }}
                     onFocus={() => setShowSuggestions(true)}
                     onClick={() => setShowSuggestions(true)}
+                    onKeyDown={e => {
+                        if (e.key === 'ArrowDown') {
+                            e.preventDefault();
+                            setShowSuggestions(true);
+                            setActiveIndex(prev => Math.min(filteredDepts.length - 1, prev + 1));
+                        } else if (e.key === 'ArrowUp') {
+                            e.preventDefault();
+                            setActiveIndex(prev => Math.max(0, prev - 1));
+                        } else if (e.key === 'Enter') {
+                            if (showSuggestions && activeIndex >= 0 && activeIndex < filteredDepts.length) {
+                                e.preventDefault();
+                                onChange(getDeptDisplay(filteredDepts[activeIndex]));
+                                setShowSuggestions(false);
+                            }
+                        } else if (e.key === 'Escape') {
+                            setShowSuggestions(false);
+                        }
+                    }}
                 />
                 {value && <button onClick={() => { onChange(''); setShowSuggestions(true); }} className="absolute right-3.5 top-3.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-purple-500 focus-visible:outline-none rounded-full p-0.5" aria-label="ล้างข้อความ"><X size={16} /></button>}
             </div>
             {showSuggestions && filteredDepts.length > 0 && (
                 <ul className="absolute z-50 w-full bg-white/95 dark:bg-slate-950/95 border border-slate-200 dark:border-white/10 rounded-2xl shadow-xl mt-1.5 max-h-60 overflow-y-auto custom-scrollbar backdrop-blur-md" role="listbox">
-                    {filteredDepts.map(d => (
+                    {filteredDepts.map((d, idx) => (
                         <li 
                             key={d.DeptID} 
-                            tabIndex={0}
+                            tabIndex={-1}
                             role="option"
-                            aria-selected={value === getDeptDisplay(d)}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ' ') {
-                                    onChange(getDeptDisplay(d)); 
-                                    setShowSuggestions(false);
-                                    e.preventDefault();
-                                }
-                            }}
-                            className="px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-900/60 cursor-pointer text-sm border-b border-slate-100 dark:border-white/5 last:border-0 transition-colors focus-visible:bg-slate-50 dark:focus-visible:bg-slate-900/60 focus-visible:outline-none" 
+                            aria-selected={value === getDeptDisplay(d) || activeIndex === idx}
+                            className={`px-4 py-3 cursor-pointer text-sm border-b border-slate-100 dark:border-white/5 last:border-0 transition-colors focus-visible:outline-none ${activeIndex === idx ? 'bg-slate-100 dark:bg-slate-900/80 font-bold' : 'hover:bg-slate-50 dark:hover:bg-slate-900/60'}`} 
                             onClick={() => { onChange(getDeptDisplay(d)); setShowSuggestions(false); }}
                         >
                              <div className="font-bold text-slate-800 dark:text-slate-200">{d.DeptName}</div>

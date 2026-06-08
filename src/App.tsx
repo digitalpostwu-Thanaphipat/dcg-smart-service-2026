@@ -19,6 +19,7 @@ function App() {
   const {
     currentUser,
     setCurrentUser,
+    setSessionToken,
     masterData,
     setMasterData,
     loading,
@@ -144,7 +145,7 @@ function App() {
       });
       if (sessionToken) {
         // Save the custom session token for Apps Script backend calls
-        sessionStorage.setItem('dcg_session_token', sessionToken);
+        setSessionToken(sessionToken);
       }
     } else {
       toast.error(`ไม่พบสิทธิ์การใช้งานสำหรับอีเมล ${email} ในระบบ`, {
@@ -225,10 +226,17 @@ function App() {
   return (
     <>
       <MainLayout>
-        {activeTab === 'run' && <RunPage />}
-        {activeTab === 'sort' && <SortPage />}
-        {activeTab === 'ext' && <ExternalPage />}
-        {activeTab === 'report' && <ReportPage />}
+        <div 
+          id={`panel-${activeTab}`} 
+          role="tabpanel" 
+          aria-labelledby={`tab-${activeTab}`}
+          className="w-full focus-visible:outline-none"
+        >
+          {activeTab === 'run' && <RunPage />}
+          {activeTab === 'sort' && <SortPage />}
+          {activeTab === 'ext' && <ExternalPage />}
+          {activeTab === 'report' && <ReportPage />}
+        </div>
         {loading && (
           <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-sm z-50 flex items-center justify-center">
             <Loader2 className="animate-spin text-purple-500 w-10 h-10" />

@@ -21,11 +21,11 @@ export default defineConfig(({ mode }) => ({
     react(),
     mode !== 'test' && VitePWA({
       registerType: 'prompt',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+      includeAssets: ['pwa_app_icon.png', 'icon-192.png', 'icon-512.png', 'vite.svg'],
       manifest: {
-        name: 'WUS Track DCG',
-        short_name: 'WUS Track',
-        description: 'ระบบบริหารงานไปรษณีย์ ส่วนอำนวยการสารบรรณ - มหาวิทยาลัยวลัยลักษณ์',
+        name: 'DCG Smart Service',
+        short_name: 'DCG Smart Service',
+        description: 'ระบบบริการงานไปรษณีย์ ส่วนอำนวยการสารบรรณ - มหาวิทยาลัยวลัยลักษณ์',
         theme_color: '#6A2C70',
         background_color: '#F9F7F7',
         display: 'standalone',
@@ -36,7 +36,7 @@ export default defineConfig(({ mode }) => ({
             type: 'image/png'
           },
           {
-            src: '/icon-192.png',
+            src: '/icon-512.png',
             sizes: '512x512',
             type: 'image/png'
           }

@@ -65,7 +65,7 @@ flowchart TB
     Backup -->|Export .xlsx| Drive
 
     subgraph External["🌐 External Services"]
-        Drive[(Google Drive<br/>WUS_Track_Backups/)]
+        Drive[(Google Drive<br/>Dcg Smart Service_Backup/)]
         LINE[LINE Notify]
     end
 
@@ -210,8 +210,8 @@ flowchart TB
 ### 3.1 กลยุทธ์
 
 * **Trigger**: Apps Script Time-driven trigger ทำงานทุกวันเวลา 02:00 น. (Asia/Bangkok)
-* **วิธีการ**: Export Google Sheets ที่เป็น transaction data เป็นไฟล์ `.xlsx` แล้วบันทึกใน Google Drive folder แยกชื่อ `WUS_Track_Backups/`
-* **ชื่อไฟล์**: `WUS_Track_Backup_<YYYY-MM-DD_HHmmss>.xlsx` (รวม timestamp ป้องกันการทับซ้อน)
+* **วิธีการ**: Export Google Sheets ที่เป็น transaction data เป็นไฟล์ `.xlsx` แล้วบันทึกใน Google Drive folder แยกชื่อ `Dcg Smart Service_Backup/`
+* **ชื่อไฟล์**: `Dcg_Smart_Service_Backup_<YYYY-MM-DD_HHmmss>.xlsx` (รวม timestamp ป้องกันการทับซ้อน)
 * **Scope**: เฉพาะ 3 sheets ธุรกรรม ได้แก่ `Tx_InternalRun`, `Tx_InternalSort`, `Tx_ExternalPost` (master data เปลี่ยนน้อย ไม่จำเป็นต้อง backup ทุกวัน)
 * **โค้ดจริง**: ดูใน [`backend.gs` บรรทัด 867-1018](../backend.gs)
 
@@ -287,7 +287,7 @@ function setupBackupTrigger() {
 
 ### 3.4 ขั้นตอนการกู้คืน (Restore Procedure)
 
-1. เปิด Google Drive → เข้า folder `WUS_Track_Backups/`
+1. เปิด Google Drive → เข้า folder `Dcg Smart Service_Backup/`
 2. Download ไฟล์ `.xlsx` ที่ต้องการ
 3. เปรียบเทียบข้อมูลกับ sheet ปัจจุบัน (ใช้ `=COUNTIF` หรือ filter)
 4. คัดลอกแถวที่หายไปวางใน sheet ปัจจุบัน (ตรวจสอบ TxID ไม่ให้ซ้ำ)

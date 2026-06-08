@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { Receipt, X, Copy } from 'lucide-react';
 
 interface ReceiptModalProps {
@@ -8,22 +9,88 @@ interface ReceiptModalProps {
 }
 
 const ReceiptModal = ({ data, onClose, userName, onCopy }: ReceiptModalProps) => {
+    const modalRef = useRef<HTMLDivElement>(null);
+    const closeBtnRef = useRef<HTMLButtonElement>(null);
+
+    useEffect(() => {
+        if (!data) return;
+
+        // Save active element to restore later
+        const previousActiveElement = document.activeElement;
+
+        // Focus close button on open
+        closeBtnRef.current?.focus();
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                onClose();
+                return;
+            }
+
+            if (e.key === 'Tab') {
+                const focusableElements = modalRef.current?.querySelectorAll(
+                    'button:not([disabled]), [tabindex="0"]'
+                );
+                if (!focusableElements || focusableElements.length === 0) return;
+
+                const firstElement = focusableElements[0] as HTMLElement;
+                const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement;
+
+                if (e.shiftKey) {
+                    if (document.activeElement === firstElement) {
+                        lastElement.focus();
+                        e.preventDefault();
+                    }
+                } else {
+                    if (document.activeElement === lastElement) {
+                        firstElement.focus();
+                        e.preventDefault();
+                    }
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+            if (previousActiveElement instanceof HTMLElement) {
+                previousActiveElement.focus();
+            }
+        };
+    }, [data, onClose]);
+
     if (!data) return null;
     const isExt = data.type === 'นำส่งไปรษณีย์';
     const headerBg = isExt ? 'bg-emerald-500' : 'bg-orange-500';
     const headerText = isExt ? 'text-slate-950' : 'text-white';
 
+    const formattedDate = new Date().toLocaleDateString('th-TH', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+    });
+
     return (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-in fade-in">
-            <div className="bg-white w-full max-w-sm rounded-xl shadow-2xl overflow-hidden">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-in fade-in" onClick={onClose}>
+            <div 
+                ref={modalRef}
+                className="bg-white w-full max-w-sm rounded-xl shadow-2xl overflow-hidden"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="receipt-title"
+                onClick={(e) => e.stopPropagation()}
+            >
                 <div className={`${headerBg} p-4 ${headerText} text-center relative`}>
-                    <h3 className="font-bold text-lg flex justify-center items-center gap-2"><Receipt /> ใบรับฝาก (Receipt)</h3>
-                    <button onClick={onClose} className="absolute top-4 right-4 opacity-80 hover:opacity-100 focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:outline-none rounded-lg" aria-label="ปิดกล่องข้อความ"><X size={20} /></button>
+                    <h3 id="receipt-title" className="font-bold text-lg flex justify-center items-center gap-2"><Receipt /> ใบรับฝาก (Receipt)</h3>
+                    <button ref={closeBtnRef} onClick={onClose} className="absolute top-4 right-4 opacity-80 hover:opacity-100 focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:outline-none rounded-lg" aria-label="ปิดกล่องข้อความ"><X size={20} /></button>
                 </div>
                 <div className="p-6 bg-gray-50 text-gray-700 text-sm font-mono">
                     <div className="text-center mb-4 border-b pb-4 border-dashed border-gray-300">
                         <div className="font-bold text-lg text-gray-800">ส่วนอำนวยการสารบรรณ</div>
-                        <div className="text-xs text-gray-700">{new Date().toLocaleString('th-TH')}</div>
+                        <div className="text-xs text-gray-700">{formattedDate} น.</div>
                         <div className="text-xs text-gray-700">Ref: {data.txId}</div>
                     </div>
                     <div className="space-y-2 mb-4">
@@ -46,7 +113,7 @@ const ReceiptModal = ({ data, onClose, userName, onCopy }: ReceiptModalProps) =>
                 <div className="p-4 bg-white border-t flex gap-2">
                     <button onClick={onClose} className="flex-1 py-2 text-gray-700 font-bold focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:outline-none rounded-lg">ปิด</button>
                     <button onClick={() => {
-                        const text = `ใบรับฝาก\nวันที่: ${new Date().toLocaleString('th-TH')}\nรายการ: ${data.items.length} รายการ\nยอดรวม: ${data.totalCost > 0 ? data.totalCost + ' บาท' : data.totalCount + ' ชิ้น'}`;
+                        const text = `ใบรับฝาก (Receipt)\nวันที่บันทึก: ${formattedDate} น.\nรายการ: ${data.items.length} รายการ\nยอดรวม: ${data.totalCost > 0 ? data.totalCost + ' บาท' : data.totalCount + ' ชิ้น'}`;
                         onCopy(text);
                     }} className={`flex-1 ${headerBg} ${isExt ? 'text-slate-950 font-extrabold' : 'text-white font-bold'} py-2 rounded-lg shadow flex justify-center gap-2 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-purple-500 focus-visible:outline-none`}><Copy size={18} /> Copy</button>
                 </div>
