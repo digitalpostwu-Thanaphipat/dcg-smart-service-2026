@@ -204,6 +204,7 @@
 * **การดำเนินการแก้ไข:**
   * **[Database Connection & Inspection]:** พัฒนาสคริปต์ `read_schema.py` ดึงรายละเอียดโครงสร้างข้อมูล 10 แผ่นงานจากสเปรดชีต V2 (`1AL0AHGleUZ1UmS2N3QAg3vM0z_E1ymJ8Eg9FfUneAD0`) ได้สำเร็จ และสร้างรายงานโครงสร้างตารางข้อมูล [schema_report.md](file:///C:/Users/Admin/.gemini/antigravity-cli/brain/935b7028-c879-4585-9975-c6278f881f93/schema_report.md) สำหรับผู้ใช้งาน
   * **[OTP Flow Verification]:** พัฒนาสคริปต์ `test_otp_flow.py` และ `test_verify_otp.py` ทดสอบการจำลองเรียกขอรหัส OTP และตรวจสอบรหัสกับระบบ Live API จริง พบว่ารันผ่านได้สำเร็จ 100% และระบบบันทึกค่าลง `Tx_OTPStore` อย่างถูกต้อง (ขจัดปัญหาช่องว่างและการพิมพ์ตัวพิมพ์เล็ก-ใหญ่ผิดพลาด)
+  * **[Google clasp Integration]:** กำหนดค่าไฟล์ `.clasp.json`, `.claspignore` และ `appsscript.json` เพื่อแมปโปรเจกต์ไปยัง Script ID `1eFOcvfTQ8GTwsFXnSO7jGZMwizAcASwk1tM8AKHl5CRRINl58w_Dfj_1` ของผู้ใช้งาน พร้อมทำการรันคำสั่ง `clasp push` อัปโหลดซอร์สโค้ด `backend.gs` และไฟล์ Manifest ทั้งหมดขึ้นไปยังเซิร์ฟเวอร์โครงการฝั่ง Apps Script ได้สำเร็จ 100%
 
 
 
