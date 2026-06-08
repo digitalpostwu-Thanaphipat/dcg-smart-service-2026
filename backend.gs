@@ -61,6 +61,50 @@ function doPost(e) {
 
 // --- Helper Functions ---
 
+// ซิงค์และกู้คืนโครงสร้างหัวตาราง Master_Users อัตโนมัติ (Self-healing Schema)
+/**
+ * ตรวจสอบและแก้ไขโครงสร้างหัวตาราง Master_Users ในสเปรดชีตอัตโนมัติหากมีคอลัมน์คลาดเคลื่อนหรือว่างเปล่า
+ * @param {Spreadsheet} ss - ออบเจกต์สเปรดชีตหลัก
+ */
+function ensureMasterUsersHeadersSync(ss) {
+  var userSheet = ss.getSheetByName("Master_Users");
+  if (!userSheet) return;
+
+  var lastRow = userSheet.getLastRow();
+  var lastCol = userSheet.getLastColumn();
+  if (lastRow === 0 || lastCol === 0) return;
+
+  var headers = userSheet.getRange(1, 1, 1, Math.min(lastCol, 10)).getValues()[0];
+  var changed = false;
+
+  // 1. ถ้าหัวคอลัมน์ B ว่างเปล่า และแถวที่ 2 เป็นอีเมล ให้ตั้งค่าเป็น "Email"
+  if (headers.length >= 2 && (!headers[1] || String(headers[1]).trim() === "")) {
+    var b2Val = String(userSheet.getRange(2, 2).getValue()).trim();
+    if (b2Val.indexOf("@") > -1) {
+      userSheet.getRange(1, 2).setValue("Email");
+      headers[1] = "Email";
+      changed = true;
+    }
+  }
+
+  // 2. ถ้าหัวคอลัมน์ C ว่างเปล่า และข้อมูลในคอลัมน์ C ทั้งหมดว่างเปล่า (แต่ D1 คือ FullName) ให้ลบคอลัมน์ C เพื่อขยับคอลัมน์ด้านขวากลับมา
+  if (headers.length >= 4 && (!headers[2] || String(headers[2]).trim() === "") && String(headers[3]).trim() === "FullName") {
+    var colCValues = userSheet.getRange(2, 3, Math.max(lastRow - 1, 1), 1).getValues();
+    var isColCEmpty = colCValues.every(function(row) {
+      return !row[0] || String(row[0]).trim() === "";
+    });
+
+    if (isColCEmpty) {
+      userSheet.deleteColumn(3);
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    SpreadsheetApp.flush();
+  }
+}
+
 // ตรวจสอบ Session Token และสิทธิ์การใช้งานช่วงวันทำการ (จันทร์-ศุกร์)
 /**
  * ตรวจสอบความถูกต้องและสิทธิ์การใช้งานของ Session Token รวมถึงสิทธิ์จำกัดช่วงวันทำการ (จันทร์-ศุกร์)
@@ -217,6 +261,7 @@ function formatYYYYMMDD(date) {
  */
 function getMetaData() {
   var ss = getSpreadsheet();
+  ensureMasterUsersHeadersSync(ss);
   
   // โหลดรายชื่อผู้ใช้งาน
   var userSheet = ss.getSheetByName("Master_Users");
@@ -733,6 +778,7 @@ function requestOTP(payload) {
   }
   
   var ss = getSpreadsheet();
+  ensureMasterUsersHeadersSync(ss);
   
   // 1. ตรวจสอบว่าผู้ใช้มีรายชื่อใน Master_Users หรือไม่
   var userSheet = ss.getSheetByName("Master_Users");
@@ -816,6 +862,7 @@ function verifyOTP(payload) {
   }
   
   var ss = getSpreadsheet();
+  ensureMasterUsersHeadersSync(ss);
   
   var today = new Date();
   
