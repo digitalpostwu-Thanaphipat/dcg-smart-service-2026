@@ -734,8 +734,9 @@ function writeSessionRecord(sheet, email, otpCode, otpExpires, sessionToken, ses
   }
   
   var foundRow = -1;
+  var searchEmail = String(email).trim().toLowerCase();
   for (var i = 1; i < values.length; i++) {
-    if (values[i][emailIdx] === email) {
+    if (String(values[i][emailIdx]).trim().toLowerCase() === searchEmail) {
       foundRow = i + 1;
       break;
     }
@@ -787,7 +788,9 @@ function requestOTP(payload) {
   }
   
   var users = getSheetDataAsObjects(userSheet);
-  var userRecord = users.find(function(u) { return u.Email.toLowerCase() === email.toLowerCase(); });
+  var userRecord = users.find(function(u) { 
+    return u.Email && String(u.Email).trim().toLowerCase() === email.toLowerCase(); 
+  });
   if (!userRecord) {
     throw new Error("ไม่พบสิทธิ์การใช้งานสำหรับอีเมล " + email + " ในระบบ กรุณาติดต่อผู้ดูแลระบบ");
   }
@@ -804,7 +807,9 @@ function requestOTP(payload) {
   } else {
     // ตรวจสอบ Server Cooldown 60 วินาที เพื่อป้องกันการส่งรหัสพร่ำเพรื่อ (Rate Limiting)
     var otpData = getSheetDataAsObjects(otpSheet);
-    var record = otpData.find(function(r) { return r.Email.toLowerCase() === email.toLowerCase(); });
+    var record = otpData.find(function(r) { 
+      return r.Email && String(r.Email).trim().toLowerCase() === email.toLowerCase(); 
+    });
     if (record && record.OTPExpiresAt) {
       var lastExpiresAt = new Date(record.OTPExpiresAt);
       if (!isNaN(lastExpiresAt.getTime())) {
@@ -880,7 +885,9 @@ function verifyOTP(payload) {
   }
   
   var otpData = getSheetDataAsObjects(otpSheet);
-  var record = otpData.find(function(r) { return r.Email.toLowerCase() === email.toLowerCase(); });
+  var record = otpData.find(function(r) { 
+    return r.Email && String(r.Email).trim().toLowerCase() === email.toLowerCase(); 
+  });
   
   if (!record) {
     throw new Error("ไม่พบรายการร้องขอรหัส OTP สำหรับอีเมลนี้");
@@ -908,7 +915,9 @@ function verifyOTP(payload) {
   // โหลดสิทธิ์
   var userSheet = ss.getSheetByName("Master_Users");
   var users = getSheetDataAsObjects(userSheet);
-  var userRecord = users.find(function(u) { return u.Email.toLowerCase() === email.toLowerCase(); });
+  var userRecord = users.find(function(u) { 
+    return u.Email && String(u.Email).trim().toLowerCase() === email.toLowerCase(); 
+  });
   if (!userRecord) {
     throw new Error("ไม่พบสิทธิ์การใช้งานสำหรับผู้ใช้นี้");
   }
