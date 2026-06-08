@@ -1,0 +1,7 @@
+{
+  "timeZone": "Asia/Bangkok",
+  "dependencies": {
+  },
+  "exceptionLogging": "CLOUD",
+  "runtimeVersion": "V8"
+}
