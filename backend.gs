@@ -183,6 +183,23 @@ function getSheetDataAsObjects(sheet) {
  * @returns {string} วันที่ฟอร์แมตแล้ว (เช่น "2026-06-05") หรือสตริงว่างหากไม่ถูกต้อง
  */
 function formatYYYYMMDD(date) {
+  if (typeof date === 'string') {
+    var parts = date.trim().split(/[\/\-\s:]/);
+    if (parts.length >= 3 && parts[0].length < 4) {
+      var day = parseInt(parts[0], 10);
+      var month = parseInt(parts[1], 10);
+      var year = parseInt(parts[2], 10);
+      if (!isNaN(day) && !isNaN(month) && !isNaN(year) && year > 1000) {
+        var hour = parts[3] ? parseInt(parts[3], 10) : 0;
+        var min = parts[4] ? parseInt(parts[4], 10) : 0;
+        var sec = parts[5] ? parseInt(parts[5], 10) : 0;
+        var d = new Date(year, month - 1, day, hour, min, sec);
+        if (!isNaN(d.getTime())) {
+          return year + "-" + String(month).padStart(2, '0') + "-" + String(day).padStart(2, '0');
+        }
+      }
+    }
+  }
   var d = new Date(date);
   if (isNaN(d.getTime())) return "";
   var y = d.getFullYear();
