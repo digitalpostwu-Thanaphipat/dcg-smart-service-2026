@@ -524,8 +524,43 @@ function saveBatch(payload) {
       sheet.appendRow(headers);
     }
 
+    // [GGSheet Protocol] - ป้องกันข้อมูลธุรกรรมซ้ำซ้อน (Deduplication Guard)
+    var lastRow = sheet.getLastRow();
+    if (lastRow > 1) {
+      var existingTxIds = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+      var isDuplicate = existingTxIds.some(function(row) {
+        return row[0] === txId;
+      });
+      if (isDuplicate) {
+        return {
+          message: "บันทึกข้อมูลเรียบร้อยแล้ว (ตรวจพบรายการซ้ำซ้อนและข้ามการบันทึกเดิม)",
+          txId: txId,
+          isDuplicate: true
+        };
+      }
+    }
+
     var timestamp = new Date();
     var rowsToWrite = [];
+
+    // ดึงชื่อเต็มจากตารางผู้ใช้งานโดยอ้างอิงอีเมล (StaffEmail -> ชื่อ-สกุล)
+    var staffDisplay = common.staffEmail || "";
+    if (staffDisplay && staffDisplay.indexOf("@") !== -1) {
+      try {
+        var userSheet = ss.getSheetByName("Master_Users");
+        if (userSheet) {
+          var users = getSheetDataAsObjects(userSheet);
+          var userRec = users.find(function (u) {
+            return u.Email && String(u.Email).trim().toLowerCase() === staffDisplay.toLowerCase();
+          });
+          if (userRec && userRec.FullName) {
+            staffDisplay = userRec.FullName;
+          }
+        }
+      } catch (e) {
+        console.warn("Failed to lookup user display name: " + e.toString());
+      }
+    }
 
     for (var i = 0; i < items.length; i++) {
       var item = items[i];
@@ -538,7 +573,7 @@ function saveBatch(payload) {
 
         if (h === "TxID") val = txId;
         else if (h === "Timestamp") val = timestamp;
-        else if (h === "StaffEmail") val = common.staffEmail || "";
+        else if (h === "StaffEmail") val = staffDisplay;
         // กรองการบันทึกตามประเภทข้อมูล
         else if (type === "run") {
           if (h === "DeptName") val = item.deptName;
@@ -580,12 +615,15 @@ function saveBatch(payload) {
       .getRange(lastRow + 1, 1, rowsToWrite.length, currentHeaders.length)
       .setValues(rowsToWrite);
 
-    // ตั้งค่ารูปแบบคอลัมน์ Timestamp ให้แสดงเวลาด้วย
+    // ตั้งค่ารูปแบบคอลัมน์ Timestamp ให้แสดงวันที่และเวลา (yyyy-MM-dd HH:mm:ss) สำหรับทุกแถว
     var timeColIdx = currentHeaders.indexOf("Timestamp");
     if (timeColIdx !== -1) {
-      sheet
-        .getRange(lastRow + 1, timeColIdx + 1, rowsToWrite.length, 1)
-        .setNumberFormat("yyyy-MM-dd HH:mm:ss");
+      var totalRows = sheet.getLastRow();
+      if (totalRows > 1) {
+        sheet
+          .getRange(2, timeColIdx + 1, totalRows - 1, 1)
+          .setNumberFormat("yyyy-MM-dd HH:mm:ss");
+      }
     }
 
     SpreadsheetApp.flush();
@@ -1185,6 +1223,7 @@ function verifyOTP(payload) {
     email: userRecord.Email,
     fullName: userRecord.FullName,
     role: userRecord.Role,
+    userID: userRecord.UserID || "",
     sessionToken: sessionToken,
   };
 }
@@ -1433,6 +1472,10 @@ function runAutoBackup() {
       "Tx_InternalRun",
       "Tx_InternalSort",
       "Tx_ExternalPost",
+      "Master_Users",
+      "Master_Departments",
+      "Master_Services",
+      "System_Config",
     ];
 
     // 1. สร้าง Spreadsheet ชั่วคราวเพื่อรวบรวมชีทธุรกรรม

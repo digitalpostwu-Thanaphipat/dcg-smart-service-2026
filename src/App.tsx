@@ -7,7 +7,6 @@ import { SortPage } from './pages/SortPage';
 import { ExternalPage } from './pages/ExternalPage';
 import { ReportPage } from './pages/ReportPage';
 import { Loader2, Sun, Moon } from 'lucide-react';
-import { toast } from 'sonner';
 import { APP_NAME } from './config';
 import { LoginView } from './components/auth/LoginView';
 import { PublicTrackView } from './components/auth/PublicTrackView';
@@ -20,7 +19,6 @@ function App() {
     currentUser,
     setCurrentUser,
     setSessionToken,
-    masterData,
     setMasterData,
     loading,
     setLoading,
@@ -100,10 +98,10 @@ function App() {
     };
   }, []);
 
-  const fetchMetaData = async () => {
+  const fetchMetaData = async (tokenOverride?: string) => {
     setLoading(true);
     try {
-      const json = await api.fetchMetaData();
+      const json = await api.fetchMetaData(tokenOverride);
       if (json.status === 'success') {
         setMasterData(json.data);
         if (json.data.config && json.data.config.announcement) {
@@ -136,21 +134,19 @@ function App() {
     }
   };
 
-  const handleLogin = (email: string, fullName?: string, sessionToken?: string) => {
-    const user = masterData?.users.find(u => u.Email.toLowerCase() === email.toLowerCase());
-    if (user) {
-      setCurrentUser({
-        ...user,
-        FullName: user.FullName || fullName || user.Email.split('@')[0]
-      });
-      if (sessionToken) {
-        // Save the custom session token for Apps Script backend calls
-        setSessionToken(sessionToken);
-      }
-    } else {
-      toast.error(`ไม่พบสิทธิ์การใช้งานสำหรับอีเมล ${email} ในระบบ`, {
-        description: 'กรุณาติดต่อผู้ดูแลระบบเพื่อลงทะเบียนสิทธิ์เข้าใช้งาน',
-      });
+  const handleLogin = (email: string, fullName?: string, sessionToken?: string, role?: string, userID?: string) => {
+    const user = {
+      UserID: userID || '',
+      Email: email,
+      FullName: fullName || email.split('@')[0],
+      Role: role || 'Staff'
+    };
+    setCurrentUser(user);
+    if (sessionToken) {
+      // Save the custom session token for Apps Script backend calls
+      setSessionToken(sessionToken);
+      // Immediately fetch metadata using the newly acquired session token
+      fetchMetaData(sessionToken);
     }
   };
 

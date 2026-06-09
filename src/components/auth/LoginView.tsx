@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Globe, Settings, AlertCircle, ArrowRight, Mail, ShieldAlert } from 'lucide-react';
 import { api } from '../../services/api';
 interface LoginViewProps {
-  onLogin: (email: string, fullName?: string, sessionToken?: string) => void;
+  onLogin: (email: string, fullName?: string, sessionToken?: string, role?: string, userID?: string) => void;
   onShowPublic: () => void;
 }
 
@@ -81,7 +81,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onShowPublic }) =
     try {
       const res = await api.verifyOTP(trimmedEmail, trimmedCode);
       if (res.status === 'success' && res.data) {
-        onLogin(res.data.email, res.data.fullName, res.data.sessionToken);
+        onLogin(res.data.email, res.data.fullName, res.data.sessionToken, res.data.role, res.data.userID);
       } else {
         setErrorMsg(res.message || 'รหัส OTP ไม่ถูกต้องหรือหมดอายุ');
       }
@@ -257,9 +257,9 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onShowPublic }) =
         <button
           type="button"
           onClick={onShowPublic}
-          className="text-purple-400 hover:text-purple-300 text-xs font-bold flex items-center justify-center gap-2 w-full p-2.5 hover:bg-white/5 rounded-xl transition-all focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-purple-500 focus-visible:outline-none"
+          className="text-purple-400 hover:text-purple-300 text-xs font-bold flex items-center justify-center gap-2 w-full p-2.5 hover:bg-white/5 rounded-xl transition-all focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-purple-500 dark:focus-visible:ring-orange-500 focus-visible:outline-none"
         >
-          <Globe size={14} /> ตรวจสอบสถานะเอกสาร/ไปรษณีย์ภัณฑ์ (บุคคลทั่วไป)
+          <Globe size={14} /> ตรวจสอบการใช้บริการของหน่วยงาน
         </button>
       </div>
     </div>

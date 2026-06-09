@@ -2,66 +2,55 @@
 
 เรียนผู้ใช้งานและผู้ตรวจสอบระบบ,
 
-เราได้ดำเนินการติดตั้งและพัฒนาชุดทดสอบการทำงานของอินเตอร์เฟสในส่วนของหน้าตรวจสอบสถานะเอกสารสาธารณะ (Public Tracking) ผ่านเฟรมเวิร์กทดสอบยอดนิยม **Microsoft Playwright** เป็นที่เรียบร้อย โดยชุดทดสอบดังกล่าวช่วยยืนยันความถูกต้องของคุณลักษณะ (Features) ใหม่ ๆ ที่ถูกเพิ่มเติมเข้ามาได้อย่างมีประสิทธิภาพ:
+เราได้ดำเนินการย้ายสคริปต์การทดสอบและยกระดับขึ้นเป็นชุดทดสอบระบบอัตโนมัติ (E2E Tests) แบบเป็นทางการในโครงการ โดยติดตั้งแพ็กเกจ `@playwright/test` ลงในระบบ และพัฒนาสคริปต์ทดสอบครบถ้วนทุกการทำงานหลักและเมนูการบันทึกข้อมูลเพื่อป้องกันปัญหาซอฟต์แวร์ทำงานผิดพลาด (Regression) จากการปรับแต่งโค้ดในอนาคต:
 
 ---
 
 ## 🧪 รายละเอียดสคริปต์การทดสอบ (Test Script)
-สคริปต์ทดสอบถูกเก็บไว้ที่: `.\.gemini\antigravity-cli\scratch\playwright-test-sanity.js`
+สคริปต์ทดสอบหลัก: `.\e2e\sanity.spec.ts`  
+ไฟล์ตั้งค่าอย่างเป็นทางการ: `.\playwright.config.ts`
 
-### ขั้นตอนที่ดำเนินการทดสอบ (Steps Covered):
-1. **การโหลดหน้าล็อกอินหลัก (Login Page Loading):** ตรวจทานการแสดงโลโก้และชื่อแบรนด์หลัก "DCG Smart Service"
-2. **การสลับไปยังระบบสาธารณะ (Public Mode Transition):** จำลองการคลิกที่ปุ่มลิงก์ `ตรวจสอบสถานะเอกสาร/ไปรษณีย์ภัณฑ์ (บุคคลทั่วไป)` 
-3. **การค้นหาและจำลองการดึงข้อมูล (Smart Interception):** 
-   * ทำการค้นหาหน่วยงานเป้าหมาย "สำนักอำนวยการ"
-   * ใช้คุณสมบัติ Request Mocking ของ Playwright ในการดักข้อมูล `POST` ที่ยิงไปยัง Google Apps Script
-   * ส่งคืนข้อมูลจำลองในเครือข่าย เพื่อรันการทดสอบได้แม้ทำงานแบบออฟไลน์
-4. **การตรวจสอบปุ่มปฏิทินสำเร็จรูป (Date Presets Validation):** 
-   * กดเลือก **วันนี้** -> ตรวจสอบว่าช่องปฏิทินอัปเดตและปุ่มแสดงสถานะไฮไลต์ (Active) สีม่วงชัดเจน
-   * กดเลือก **เดือนนี้** -> ตรวจสอบการไฮไลต์และช่วงวันที่
-   * กดเลือก **ปีงบประมาณ** -> ตรวจสอบตรรกะการข้ามปีงบประมาณและการแสดงผลไฮไลต์สีม่วง
-5. **การทดสอบความยืดหยุ่นของโหมดมืด (Dark/Light Switch):** จำลองการสลับปุ่ม Sun/Moon และเปลี่ยนคลาสของ Document Root
-6. **การเปลี่ยนเส้นทางกลับ (Back Navigation):** ทดสอบปุ่มกดย้อนกลับไปยังหน้าจอเข้าใช้งานของบุคลากรหลัก
+### ขอบเขตการตรวจสอบครอบคลุม (Menu & Workflow Coverage):
+1. **หน้าตรวจสอบการใช้บริการของหน่วยงาน (Public Tracking / Service Usage Verification):**
+   * ตรวจสอบการเปลี่ยนปุ่มลิงก์ด้านหน้าเป็น "ตรวจสอบการใช้บริการของหน่วยงาน"
+   * ค้นหาหน่วยงานทดสอบ "สำนักอำนวยการ"
+   * ตรวจสอบตรรกะการฟิลเตอร์ช่วงวันที่ผ่าน Preset สำเร็จรูป (วันนี้, เดือนนี้, ปีงบประมาณ)
+   * ตรวจสอบการทำงานของฟังก์ชัน Dark/Light Mode
+2. **ระบบเข้าสู่ระบบของเจ้าหน้าที่ (Staff Login Flow):**
+   * ตรวจสอบการขอรหัส OTP และกรอกรหัสยืนยันตัวตน 6 หลักเพื่อเข้าสู่ระบบหลัก
+3. **การจำลองกรอกข้อมูลบันทึกงานของทุกเมนูการทำงานหลัก (Form Submissions Simulation):**
+   * **งานรับ-ส่งเอกสารภายใน (RunPage):** เลือกสายส่ง (สาย A), เลือกแผนก, ปรับเพิ่มจำนวนซองเอกสาร และกดปุ่ม "บันทึกการรับ-ส่ง"
+   * **งานคัดแยกไปรษณีย์ภัณฑ์ (SortPage):** ค้นหาและระบุแผนก, ใส่ยอดไปรษณีย์ธรรมดา/ลงทะเบียน/ส่วนตัว, กดปุ่ม "เพิ่มลงรายการ" ตรวจทานความถูกต้องของรายการในรถเข็นก่อนบันทึก และกดปุ่ม "ยืนยันบันทึกทั้งหมด"
+   * **งานนำส่งไปรษณีย์ภายนอก (ExternalPage):** ระบุแผนกผู้ส่ง, เลือกประเภทบริการ (EMS), ใส่ยอดเงินค่าบริการและเลขลงทะเบียนพัสดุ (Tracking No.), กดปุ่ม "เพิ่มรายการส่งออก" และกดปุ่ม "ยืนยันนำส่งไปรษณีย์"
+4. **หน้ารายงานผลการดำเนินงาน (ReportPage):**
+   * สลับแท็บและตรวจความพร้อมในการเรนเดอร์กราฟและตารางรายงานแยกแต่ละประเภท ได้แก่ รับ-ส่งภายใน, คัดแยก-นำจ่าย, นำส่งภายนอก และรายการข้อมูลรวม
 
 ---
 
 ## 📊 ผลการทดสอบ (Execution Logs)
 
-การสั่งรันทำได้ผ่านตัวดำเนินการของระบบ:
+การสั่งรันอย่างเป็นทางการผ่านคำสั่งใน `package.json`:
 ```bash
-> node run.js .\.gemini\antigravity-cli\scratch\playwright-test-sanity.js
+> npm run test:e2e
 ```
 
-**บันทึกผลการทำงานจากหน้าจอเบราว์เซอร์จริง (Headless Mode):**
+**บันทึกผลการทำงานจากหน้าจอเบราว์เซอร์จริง (Chromium Headless Mode):**
 ```text
-🎭 Playwright Skill - Universal Executor
+> wus-track@0.0.0 test:e2e
+> playwright test
 
-📄 Executing file: .\.gemini\antigravity-cli\scratch\playwright-test-sanity.js
-🚀 Starting automation...
+Running 3 tests using 2 workers
 
-🚀 Starting Playwright test on http://localhost:5174...
-[MOCK API] Intercepted POST request: action="getMetaData"
-[MOCK API] Intercepted POST request: action="getMetaData"
-Page loaded successfully
-Brand Header: "DCG Smart Service"
-Switched to Public Tracking view
-[MOCK API] Intercepted POST request: action="publicSearch"
-Executed search query for "สำนักอำนวยการ"
-✅ Search results and date range controls displayed
-"วันนี้" preset clicked. Active state matching: true
-"เดือนนี้" preset clicked. Active state matching: true
-"ปีงบประมาณ" preset clicked. Active state matching: true
-Theme toggle clicked
-Returned back to login page
-🎉 Playwright sanity checks PASSED successfully!
+  ok 2 [chromium] › e2e\sanity.spec.ts:147:3 › should handle staff OTP request and mock login flow (4.7s)
+  ok 1 [chromium] › e2e\sanity.spec.ts:95:3 › should load application, verify brand header, and switch to public mode (ตรวจสอบการใช้บริการของหน่วยงาน) (5.6s)
+  ok 3 [chromium] › e2e\sanity.spec.ts:167:3 › should simulate transaction submissions on all 3 operational tabs and verify in ReportPage (8.1s)
+
+  3 passed (14.7s)
 ```
 
 ---
 
-## 💡 สิ่งที่ได้รับจากการประเมินผล E2E
-
-* **ความแม่นยำทางด้าน Timezone:** การกดปุ่ม Preset ในเบราว์เซอร์จำลอง สามารถแปลงเป็นปี พ.ศ. และช่วงวันเริ่มต้น-สิ้นสุดในฟังก์ชันปฏิทินอินพุตได้อย่างเที่ยงตรง ไม่พบปัญหาข้ามเขตเวลา
-* **การออกแบบ Contrast แสง-มืด:** การเรนเดอร์ในสภาวะจำลองและเปลี่ยนสลับธีม ได้รับค่า Contrast 100% ผ่านการทดสอบ
-* **ผลสรุปสถานะ:** 🟢 **PASSED (ผ่านสมบูรณ์)**
-
-ชุดทดสอบพร้อมที่จะสั่งรันแบบอัตโนมัติในกระบวนการถัดไปได้ทันทีครับ!
+## 💡 สิ่งที่ได้รับและการประเมินผลการล็อกฟังก์ชัน
+* **ความมั่นใจด้าน Regression**: ชุดทดสอบนี้จะช่วยสกัดจับการทำงานที่ผิดพลาดของฟอร์มกรอกข้อมูลทันทีเมื่อ AI หรือผู้พัฒนาระบบคนอื่นๆ ปรับแต่งสไตล์หรือแก้ไขฟังก์ชันการทำงานใน Zustand Store, Sync Engine หรือ IndexedDB
+* **สอดคล้องกับพฤติกรรมจริง**: ครอบคลุมการทำงานแบบ End-to-End ตั้งแต่ผู้ใช้งานทั่วไป (Public) ไปจนถึงระดับปฏิบัติการหลังบ้าน
+* **ผลสรุปสถานะ:** 🟢 **PASSED (ผ่านการทดสอบสมบูรณ์ 100%)**

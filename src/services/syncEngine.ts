@@ -93,9 +93,18 @@ export const syncEngine = {
   saveTransaction: async (type: 'run' | 'sort' | 'ext', items: any[], common: any) => {
     const store = useAppStore.getState();
     
-    // Generate unique ID and timestamp
-    const txId = `TX-${Date.now().toString().slice(-6)}-${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
-    const timestampStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    // Generate unique ID and timestamp in the old style: PREFIX-YYYYMMDD-RAND4
+    const prefix = type.toUpperCase();
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    const dateStr = `${yyyy}${mm}${dd}`;
+    const rand = Array.from({ length: 4 }, () => 
+      'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'.charAt(Math.floor(Math.random() * 36))
+    ).join('');
+    const txId = `${prefix}-${dateStr}-${rand}`;
+    const timestampStr = now.toISOString().replace('T', ' ').substring(0, 19);
 
     // Format description and calculations
     let desc = '';

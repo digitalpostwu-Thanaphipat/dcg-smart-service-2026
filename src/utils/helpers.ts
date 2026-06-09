@@ -7,3 +7,50 @@ export const getRealOwner = (deptName: string, departments?: Department[]) => {
     const dept = departments.find(d => d.DeptName === deptName);
     return dept?.BudgetOwner || deptName;
 };
+
+const formatLocalDate = (date: Date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+};
+
+export const getDateRange = (
+    filters: { dateMode: string; startDate: string; endDate: string },
+    baseDate: Date = new Date()
+) => {
+    const todayStr = formatLocalDate(baseDate);
+
+    switch (filters.dateMode) {
+        case 'today':
+            return { start: todayStr, end: todayStr };
+
+        case 'month': {
+            const firstDay = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1);
+            const lastDay = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 0);
+            return {
+                start: formatLocalDate(firstDay),
+                end: formatLocalDate(lastDay),
+            };
+        }
+
+        case 'fiscal': {
+            // ปีงบประมาณไทย: ต.ค. ปีก่อน -> ก.ย. ปีปัจจุบัน
+            const year = baseDate.getMonth() >= 9 ? baseDate.getFullYear() : baseDate.getFullYear() - 1;
+            return {
+                start: `${year}-10-01`,
+                end: `${year + 1}-09-30`,
+            };
+        }
+
+        case 'custom':
+        default: {
+            const start = filters.startDate;
+            const end = filters.endDate;
+            if (start && end && start > end) {
+                return { start: end, end: start };
+            }
+            return { start, end };
+        }
+    }
+};

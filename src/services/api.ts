@@ -31,10 +31,11 @@ const handleJsonResponse = async (res: Response) => {
 };
 
 export const api = {
-    fetchMetaData: async () => {
+    fetchMetaData: async (tokenOverride?: string) => {
+        const authPayload = tokenOverride ? { sessionToken: tokenOverride } : getAuthPayload();
         const res = await fetch(API_URL, { 
             method: 'POST', 
-            body: JSON.stringify({ action: 'getMetaData', auth: getAuthPayload() }) 
+            body: JSON.stringify({ action: 'getMetaData', auth: authPayload }) 
         });
         return await handleJsonResponse(res);
     },

@@ -8,7 +8,7 @@ import {
   CloudOff, RefreshCw, ListFilter, Link
 } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { getRealOwner } from '../utils/helpers';
+import { getRealOwner, getDateRange } from '../utils/helpers';
 import { LogItem } from '../types';
 import { getNonSyncedLogs, deleteLogLocal } from '../lib/db';
 import { ReportFilters } from '../components/reports/ReportFilters';
@@ -19,42 +19,6 @@ import { RUN_SAVING_PER_UNIT } from '../lib/constants';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
 
 type ReportTab = 'list' | 'run' | 'sort' | 'ext';
-
-/**
- * คำนวณช่วงวันที่จาก dateMode
- * ปีงบประมาณไทย: 1 ตุลาคม — 30 กันยายน
- */
-function getDateRange(filters: { dateMode: string; startDate: string; endDate: string }) {
-  const now = new Date();
-  const todayStr = now.toISOString().split('T')[0];
-
-  switch (filters.dateMode) {
-    case 'today':
-      return { start: todayStr, end: todayStr };
-
-    case 'month': {
-      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      return {
-        start: firstDay.toISOString().split('T')[0],
-        end: lastDay.toISOString().split('T')[0],
-      };
-    }
-
-    case 'fiscal': {
-      // ปีงบประมาณไทย: ต.ค. ปีก่อน → ก.ย. ปีปัจจุบัน
-      const year = now.getMonth() >= 9 ? now.getFullYear() : now.getFullYear() - 1;
-      return {
-        start: `${year}-10-01`,
-        end: `${year + 1}-09-30`,
-      };
-    }
-
-    case 'custom':
-    default:
-      return { start: filters.startDate, end: filters.endDate };
-  }
-}
 
 export const ReportPage: React.FC = () => {
   const {
@@ -76,10 +40,16 @@ export const ReportPage: React.FC = () => {
     if (!currentUser) return;
     setLoading(true);
     try {
+      const dateRange = getDateRange(filters);
       // 1. ดึงจาก API
       let apiList: LogItem[] = [];
       try {
-        const json = await api.searchLogs(filters, currentUser.Email);
+        const resolvedFilters = {
+          ...filters,
+          startDate: dateRange.start,
+          endDate: dateRange.end,
+        };
+        const json = await api.searchLogs(resolvedFilters, currentUser.Email);
         if (json.status === 'success') {
           json.data.run.forEach((r: any) =>
             apiList.push({
@@ -193,7 +163,6 @@ export const ReportPage: React.FC = () => {
       }
 
       // 3. กรองข้อมูลในเครื่องตามวันที่
-      const dateRange = getDateRange(filters);
       const filteredLocalList = localList.filter((item) => {
         if (filters.type !== 'all' && item.type !== filters.type) return false;
         const itemDate = item.timestamp.split(' ')[0];
@@ -228,7 +197,8 @@ export const ReportPage: React.FC = () => {
   const handleDelete = useCallback(async (id: string, type: string) => {
     setLoading(true);
     try {
-      if (id.startsWith('TX-')) {
+      const logItem = logs.find(l => l.id === id);
+      if (logItem && logItem.syncStatus !== 'synced') {
         await deleteLogLocal(id);
       } else {
         await api.deleteLog(id, type);
@@ -259,6 +229,7 @@ export const ReportPage: React.FC = () => {
       arr.reduce((acc, curr) => acc + (curr.cost || 0), 0);
     const runTotal = sum(runStats);
 
+    const dateRange = getDateRange(filters);
     let dateLabel = '';
     const now = new Date();
     if (filters.dateMode === 'today') {
@@ -272,8 +243,8 @@ export const ReportPage: React.FC = () => {
       dateLabel = `(ประจำปีงบประมาณ ${fiscalYear})`;
     } else {
       try {
-        const start = new Date(filters.startDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
-        const end = new Date(filters.endDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+        const start = new Date(dateRange.start).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+        const end = new Date(dateRange.end).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
         dateLabel = `(วันที่ ${start} - ${end})`;
       } catch (e) {
         dateLabel = '';
@@ -381,8 +352,8 @@ export const ReportPage: React.FC = () => {
       >
         {reportTab === 'list' && (
           <div className="space-y-3">
-            {logs.map((log) => (
-              <GlassCard key={log.id} className="hover:border-white/20 transition-all">
+            {logs.map((log, index) => (
+              <GlassCard key={`${log.id}-${index}`} className="hover:border-white/20 transition-all">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     <div
