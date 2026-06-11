@@ -5,7 +5,8 @@ import { GlassCard } from '../components/shared/GlassCard';
 import {
   Search, Trash2, Copy,
   TrendingUp, Mail, Package,
-  CloudOff, RefreshCw, ListFilter, Link
+  CloudOff, RefreshCw, ListFilter, Link,
+  FileSpreadsheet, Calculator
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { getRealOwner, getDateRange } from '../utils/helpers';
@@ -15,10 +16,13 @@ import { ReportFilters } from '../components/reports/ReportFilters';
 import { RunReport } from '../components/reports/RunReport';
 import { SortReport } from '../components/reports/SortReport';
 import { ExtReport } from '../components/reports/ExtReport';
+import { BudgetReport } from '../components/reports/BudgetReport';
 import { RUN_SAVING_PER_UNIT } from '../lib/constants';
+import { normalizeFundSource } from '../utils/fundSource';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
+import * as XLSX from 'xlsx';
 
-type ReportTab = 'list' | 'run' | 'sort' | 'ext';
+type ReportTab = 'list' | 'run' | 'sort' | 'ext' | 'budget';
 
 export const ReportPage: React.FC = () => {
   const {
@@ -280,6 +284,131 @@ export const ReportPage: React.FC = () => {
     }, 2000);
   };
 
+  const exportToExcel = () => {
+    let exportData: any[] = [];
+    let filename = 'report';
+
+    const formatDateStr = (ts: string) => ts;
+
+    const getStatusText = (status?: string) => {
+      if (status === 'synced') return 'ซิงค์แล้ว';
+      if (status === 'pending') return 'ค้างซิงค์ (ออฟไลน์)';
+      if (status === 'syncing') return 'กำลังซิงค์';
+      return 'ซิงค์แล้ว';
+    };
+
+    if (reportTab === 'list') {
+      filename = `DCG_Smart_Service_รายการทั้งหมด_${new Date().toISOString().split('T')[0]}`;
+      exportData = logs.map(l => ({
+        'รหัสธุรกรรม': l.id,
+        'วันเวลา': formatDateStr(l.timestamp),
+        'ประเภทงาน': l.type === 'run' ? 'รับ-ส่งภายใน' : l.type === 'sort' ? 'คัดแยก-นำจ่าย' : 'นำส่งภายนอก',
+        'หน่วยงาน': l.dept,
+        'รายละเอียด': l.desc,
+        'จำนวนชิ้น/ซอง': l.count,
+        'ค่าบริการ (บาท)': l.cost !== undefined ? l.cost : '-',
+        'สถานะการซิงค์': getStatusText(l.syncStatus),
+      }));
+    } else if (reportTab === 'run') {
+      filename = `DCG_Smart_Service_รับส่งภายใน_${new Date().toISOString().split('T')[0]}`;
+      const runLogs = logs.filter(l => l.type === 'run');
+      exportData = runLogs.map(l => ({
+        'รหัสธุรกรรม': l.id,
+        'วันเวลา': formatDateStr(l.timestamp),
+        'สายส่ง': l.route || 'ไม่ระบุสาย',
+        'รอบการส่ง': l.round || 'รอบทั่วไป',
+        'หน่วยงาน': l.dept,
+        'จำนวนซอง': l.count,
+        'มูลค่าประหยัดสะสม (บาท)': l.count * RUN_SAVING_PER_UNIT,
+        'สถานะการซิงค์': getStatusText(l.syncStatus),
+      }));
+    } else if (reportTab === 'sort') {
+      filename = `DCG_Smart_Service_คัดแยกนำจ่าย_${new Date().toISOString().split('T')[0]}`;
+      const sortLogs = logs.filter(l => l.type === 'sort');
+      exportData = sortLogs.map(l => ({
+        'รหัสธุรกรรม': l.id,
+        'วันเวลา': formatDateStr(l.timestamp),
+        'หน่วยงาน': l.dept,
+        'ไปรษณีย์ธรรมดา (ชิ้น)': l.normalCount || 0,
+        'ไปรษณีย์ลงทะเบียน (ชิ้น)': l.registerCount || 0,
+        'ไปรษณีย์ส่วนตัว (ชิ้น)': l.privateCount || 0,
+        'รวมยอด (ชิ้น)': l.count,
+        'สถานะการซิงค์': getStatusText(l.syncStatus),
+      }));
+    } else if (reportTab === 'ext') {
+      filename = `DCG_Smart_Service_นำส่งภายนอก_${new Date().toISOString().split('T')[0]}`;
+      const extLogs = logs.filter(l => l.type === 'ext');
+      exportData = extLogs.map(l => {
+        const parts = l.desc.split(' ');
+        const serviceType = l.desc.includes(' ') ? parts[0] : l.desc;
+        const trackingNo = l.desc.includes(' ') ? parts.slice(1).join(' ') : '-';
+        return {
+          'รหัสธุรกรรม': l.id,
+          'วันเวลา': formatDateStr(l.timestamp),
+          'หน่วยงานผู้ส่ง': l.dept,
+          'ประเภทบริการ': serviceType,
+          'เลขพัสดุ (Tracking No)': trackingNo,
+          'แหล่งงบประมาณ': normalizeFundSource(l.fund),
+          'จำนวนชิ้น': l.count,
+          'ค่าบริการ (บาท)': l.cost || 0,
+          'สถานะการซิงค์': getStatusText(l.syncStatus),
+        };
+      });
+    } else if (reportTab === 'budget') {
+      filename = `DCG_Smart_Service_รายงานวิเคราะห์งบประมาณ_${new Date().toISOString().split('T')[0]}`;
+      const deptMap: Record<string, any> = {};
+      logs.forEach(l => {
+        const resolvedName = getRealOwner(l.dept, masterData?.departments) || l.dept;
+        if (!deptMap[resolvedName]) {
+          deptMap[resolvedName] = {
+            'หน่วยงาน': resolvedName,
+            'จำนวนซองรับส่งภายใน': 0,
+            'ประหยัดงบภายใน (บาท)': 0,
+            'คัดแยกนำจ่าย (ชิ้น)': 0,
+            'นำส่งภายนอก (ชิ้น)': 0,
+            'ค่าส่งภายนอก (บาท)': 0,
+            'ผลตอบแทนสุทธิ (บาท)': 0
+          };
+        }
+        const item = deptMap[resolvedName];
+        if (l.type === 'run') {
+          item['จำนวนซองรับส่งภายใน'] += l.count || 0;
+          item['ประหยัดงบภายใน (บาท)'] += (l.count || 0) * RUN_SAVING_PER_UNIT;
+        } else if (l.type === 'sort') {
+          item['คัดแยกนำจ่าย (ชิ้น)'] += l.count || 0;
+        } else if (l.type === 'ext') {
+          item['นำส่งภายนอก (ชิ้น)'] += l.count || 0;
+          item['ค่าส่งภายนอก (บาท)'] += l.cost || 0;
+        }
+      });
+      Object.values(deptMap).forEach(item => {
+        item['ผลตอบแทนสุทธิ (บาท)'] = item['ประหยัดงบภายใน (บาท)'] - item['ค่าส่งภายนอก (บาท)'];
+      });
+      exportData = Object.values(deptMap).sort((a, b) => b['ค่าส่งภายนอก (บาท)'] - a['ค่าส่งภายนอก (บาท)']);
+    }
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'รายงานผล');
+
+    if (exportData.length > 0) {
+      const colWidths = Object.keys(exportData[0]).map(key => {
+        const headerLen = encodeURIComponent(key).includes('%') ? key.length * 2.3 : key.length;
+        const maxValLen = exportData.reduce((max, row) => {
+          const val = String(row[key] || '');
+          const valLen = encodeURIComponent(val).includes('%') ? val.length * 2.3 : val.length;
+          return Math.max(max, valLen);
+        }, headerLen);
+        return { wch: Math.min(Math.max(maxValLen + 2, 10), 40) };
+      });
+      ws['!cols'] = colWidths;
+    }
+
+    XLSX.writeFile(wb, `${filename}.xlsx`);
+    setStatus({ type: 'success', text: 'ส่งออกไฟล์ Excel สำเร็จ' });
+    setTimeout(() => setStatus(null), 3000);
+  };
+
   // ───────────── แท็บ ─────────────
 
   const tabs: { id: ReportTab; label: string; icon: React.ReactNode }[] = [
@@ -287,6 +416,7 @@ export const ReportPage: React.FC = () => {
     { id: 'run',   label: 'รับ-ส่งภายใน',   icon: <TrendingUp size={14} /> },
     { id: 'sort',  label: 'คัดแยก-นำจ่าย',  icon: <Mail size={14} /> },
     { id: 'ext',   label: 'นำส่งภายนอก',    icon: <Package size={14} /> },
+    { id: 'budget', label: 'สรุปงบประมาณ',   icon: <Calculator size={14} /> },
   ];
 
   // ───────────── Render ─────────────
@@ -337,6 +467,14 @@ export const ReportPage: React.FC = () => {
           >
             <Copy size={14} aria-hidden="true" />
             คัดลอกสรุป
+          </button>
+          <button
+            onClick={exportToExcel}
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-lg shadow-emerald-950/10 dark:shadow-emerald-950/25 transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-purple-500 dark:focus-visible:ring-orange-500 focus-visible:outline-none"
+            aria-label="ส่งออกรายงานเป็นไฟล์ Excel"
+          >
+            <FileSpreadsheet size={14} aria-hidden="true" />
+            ส่งออก Excel
           </button>
         </div>
       </div>
@@ -420,6 +558,7 @@ export const ReportPage: React.FC = () => {
         {reportTab === 'run' && <RunReport logs={logs} />}
         {reportTab === 'sort' && <SortReport logs={logs} />}
         {reportTab === 'ext' && <ExtReport logs={logs} />}
+        {reportTab === 'budget' && <BudgetReport logs={logs} />}
       </div>
 
       {/* Confirm Delete Dialog */}

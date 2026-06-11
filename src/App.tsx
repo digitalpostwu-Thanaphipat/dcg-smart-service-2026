@@ -14,6 +14,13 @@ import { getMasterData as getLocalMasterData, setMasterData as setLocalMasterDat
 import { syncEngine } from './services/syncEngine';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 
+const hasCompleteMasterData = (data: any) => (
+  Array.isArray(data?.departments) &&
+  data.departments.length > 0 &&
+  Array.isArray(data?.services) &&
+  data.services.length > 0
+);
+
 function App() {
   const {
     currentUser,
@@ -26,6 +33,7 @@ function App() {
     sysConfig,
     setSysConfig,
     setShowAnnouncement,
+    setStatus,
     theme,
     setTheme,
     setIsOnline
@@ -98,11 +106,12 @@ function App() {
     };
   }, []);
 
-  const fetchMetaData = async (tokenOverride?: string) => {
+  const fetchMetaData = async (tokenOverride?: string, options: { allowCache?: boolean } = {}) => {
+    const allowCache = options.allowCache !== false;
     setLoading(true);
     try {
       const json = await api.fetchMetaData(tokenOverride);
-      if (json.status === 'success') {
+      if (json.status === 'success' && hasCompleteMasterData(json.data)) {
         setMasterData(json.data);
         if (json.data.config && json.data.config.announcement) {
           setSysConfig(json.data.config);
@@ -114,20 +123,37 @@ function App() {
         } catch (dbErr) {
           console.error('Failed to cache metadata to IndexedDB:', dbErr);
         }
+      } else {
+        throw new Error(json.message || 'Master data response is incomplete');
       }
     } catch (e) {
       console.error('Network error fetching metadata, attempting to load from local cache:', e);
+      if (!allowCache) {
+        setStatus({
+          type: 'error',
+          text: 'Reload master data failed. Please logout/login or clear site data.',
+        });
+        setTimeout(() => setStatus(null), 5000);
+        return;
+      }
       try {
         const cached = await getLocalMasterData('meta');
-        if (cached) {
+        if (hasCompleteMasterData(cached)) {
           setMasterData(cached);
           if (cached.config && cached.config.announcement) {
             setSysConfig(cached.config);
             setShowAnnouncement(cached.config.show);
           }
+        } else {
+          throw new Error('Local master data cache is incomplete');
         }
       } catch (dbErr) {
         console.error('Failed to load metadata from IndexedDB:', dbErr);
+        setStatus({
+          type: 'error',
+          text: 'Master data unavailable. Please logout/login or reload the app.',
+        });
+        setTimeout(() => setStatus(null), 5000);
       }
     } finally {
       setLoading(false);
@@ -221,7 +247,7 @@ function App() {
 
   return (
     <>
-      <MainLayout>
+      <MainLayout onRefreshMasterData={() => fetchMetaData(undefined, { allowCache: false })}>
         <div 
           id={`panel-${activeTab}`} 
           role="tabpanel" 

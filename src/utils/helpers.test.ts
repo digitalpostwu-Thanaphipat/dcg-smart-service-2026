@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { getDeptDisplay, getRealOwner, getDateRange } from './helpers';
+import {
+    departmentMatchesSearch,
+    getBudgetOwnerEffective,
+    getDateRange,
+    getDeptDisplay,
+    getDeptLocationDisplay,
+    getRealOwner,
+} from './helpers';
 import { Department } from '../types';
 
 describe('helpers.ts utilities', () => {
@@ -13,6 +20,18 @@ describe('helpers.ts utilities', () => {
                 BudgetOwner: 'ส่วนอำนวยการ'
             };
             expect(getDeptDisplay(dept)).toBe('ส่วนอำนวยการ (อาคารบริหาร)');
+        });
+
+        it('should format display text with building and floor if both exist', () => {
+            const dept: Department = {
+                DeptID: 'D003',
+                DeptName: 'งานบริการสารบรรณ',
+                RouteGroup: 'สาย A',
+                Building: 'อาคารบริหาร',
+                Floor: 2,
+                BudgetOwner: 'ส่วนอำนวยการ'
+            };
+            expect(getDeptDisplay(dept)).toBe('งานบริการสารบรรณ (อาคารบริหาร ชั้น 2)');
         });
 
         it('should return just DeptName if building is missing or empty', () => {
@@ -43,6 +62,37 @@ describe('helpers.ts utilities', () => {
 
         it('should return input name if departments list is undefined', () => {
             expect(getRealOwner('ศูนย์คอมพิวเตอร์', undefined)).toBe('ศูนย์คอมพิวเตอร์');
+        });
+    });
+
+    describe('department metadata helpers', () => {
+        const dept: Department = {
+            DeptID: 'D004',
+            DeptName: 'งานย่อย A',
+            RouteGroup: 'สาย A',
+            Building: 'อาคารวิชาการ',
+            Floor: '3',
+            BudgetOwner: 'สำนักแม่'
+        };
+
+        it('should return BudgetOwnerEffective from BudgetOwner when present', () => {
+            expect(getBudgetOwnerEffective(dept)).toBe('สำนักแม่');
+        });
+
+        it('should fallback BudgetOwnerEffective to DeptName when BudgetOwner is blank', () => {
+            expect(getBudgetOwnerEffective({ ...dept, BudgetOwner: '' })).toBe('งานย่อย A');
+        });
+
+        it('should format location from building and floor', () => {
+            expect(getDeptLocationDisplay(dept)).toBe('อาคารวิชาการ ชั้น 3');
+        });
+
+        it('should match search text against DeptName, Building, Floor, and BudgetOwner', () => {
+            expect(departmentMatchesSearch(dept, 'งานย่อย')).toBe(true);
+            expect(departmentMatchesSearch(dept, 'อาคารวิชาการ')).toBe(true);
+            expect(departmentMatchesSearch(dept, 'ชั้น 3')).toBe(true);
+            expect(departmentMatchesSearch(dept, 'สำนักแม่')).toBe(true);
+            expect(departmentMatchesSearch(dept, 'ไม่พบคำนี้')).toBe(false);
         });
     });
 
@@ -81,4 +131,3 @@ describe('helpers.ts utilities', () => {
         });
     });
 });
-

@@ -1,5 +1,7 @@
 // --- DCG Smart Track Backend (Production Grade) ---
 
+var BACKEND_VERSION = "2026-06-11-v30-health";
+
 // [GGSheet Protocol] - ฐานข้อมูลหลัก (สามารถสลับไปดึงจาก Script Properties หรือใช้ ID สำรองเริ่มต้นนี้)
 var SPREADSHEET_ID =
   PropertiesService.getScriptProperties().getProperty("SPREADSHEET_ID") || "";
@@ -37,8 +39,12 @@ function doPost(e) {
       verifySessionToken(auth.sessionToken);
     }
 
-    if (action === "getMetaData") {
+    if (action === "getHealth") {
+      result = getHealth();
+    } else if (action === "getMetaData") {
       result = getMetaData();
+    } else if (action === "getPublicMetaData") {
+      result = getPublicMetaData();
     } else if (action === "searchLogs") {
       result = searchLogs(payload);
     } else if (action === "saveBatch") {
@@ -47,10 +53,20 @@ function doPost(e) {
       result = deleteLog(payload);
     } else if (action === "publicSearch") {
       result = publicSearch(payload);
+    } else if (action === "selfServiceSearch") {
+      result = selfServiceSearch(payload, auth);
     } else if (action === "requestOTP") {
       result = requestOTP(payload);
     } else if (action === "verifyOTP") {
       result = verifyOTP(payload);
+    } else if (action === "requestSelfServiceOTP") {
+      result = requestSelfServiceOTP(payload);
+    } else if (action === "verifySelfServiceOTP") {
+      result = verifySelfServiceOTP(payload);
+    } else if (action === "logSelfServiceEvent") {
+      var selfServiceUser = verifySelfServiceSessionToken(auth.selfServiceSessionToken);
+      payload.email = selfServiceUser.email;
+      result = logSelfServiceEvent(payload);
     } else if (action === "feedback") {
       var sessionUser = verifySessionToken(auth.sessionToken);
       payload.staffEmail = sessionUser.email; // Secure user validation
@@ -729,6 +745,26 @@ function searchLogs(payload) {
   };
 }
 
+function getPublicMetaData() {
+  var metadata = getMetaData();
+  return {
+    departments: metadata.departments,
+    services: metadata.services,
+    config: metadata.config,
+  };
+}
+
+function getHealth() {
+  var metadata = getMetaData();
+  return {
+    backendVersion: BACKEND_VERSION,
+    timestamp: new Date().toISOString(),
+    departments: metadata.departments ? metadata.departments.length : 0,
+    services: metadata.services ? metadata.services.length : 0,
+    appName: metadata.config && metadata.config.appName ? metadata.config.appName : "DCG Smart Service",
+  };
+}
+
 // 4. ลบรายการโดยค้นหาจาก TxID
 /**
  * ลบรายการประวัติธุรกรรมออกจากตารางประวัติธุรกรรม โดยค้นหาจากรหัส TxID
@@ -796,10 +832,400 @@ function deleteLog(payload) {
  * @param {string} payload.deptName - ชื่อหน่วยงานผู้รับ/ผู้ส่งที่ต้องการค้นหา
  * @returns {Object} ข้อมูลประวัติธุรกรรม run, sort และ ext ของแผนกนั้น ๆ
  */
+function normalizeEmail(email) {
+  return String(email || "").trim().toLowerCase();
+}
+
+function isDisposableEmail(email) {
+  var domain = normalizeEmail(email).split("@")[1] || "";
+  var blockedDomains = {
+    "10minutemail.com": true,
+    "guerrillamail.com": true,
+    "mailinator.com": true,
+    "tempmail.com": true,
+    "temp-mail.org": true,
+    "yopmail.com": true,
+  };
+  return blockedDomains[domain] === true;
+}
+
+function generateSixDigitOTP(seed) {
+  var bytes = Utilities.computeDigest(
+    Utilities.DigestAlgorithm.SHA_256,
+    Utilities.getUuid() + "|" + new Date().getTime() + "|" + seed,
+  );
+  var value = 0;
+  for (var i = 0; i < 4; i++) {
+    value = value * 256 + (bytes[i] & 0xff);
+  }
+  return String(100000 + (Math.abs(value) % 900000));
+}
+
+function getFridayEndOfWeek(now) {
+  var expires = new Date(now);
+  var day = expires.getDay();
+  var daysUntilFriday = (5 - day + 7) % 7;
+  expires.setDate(expires.getDate() + daysUntilFriday);
+  expires.setHours(23, 59, 59, 999);
+  return expires;
+}
+
+function getSelfServiceOtpSheet(ss) {
+  var sheet = ss.getSheetByName("Tx_SelfServiceOTPStore");
+  if (!sheet) {
+    sheet = ss.insertSheet("Tx_SelfServiceOTPStore");
+    sheet.appendRow([
+      "Email",
+      "OTPCode",
+      "OTPExpiresAt",
+      "SessionToken",
+      "SessionExpiresAt",
+      "FailedAttempts",
+      "LastRequestedAt",
+    ]);
+  }
+  return sheet;
+}
+
+var SELF_SERVICE_LOG_SHEET_NAME = "Tx_SelfServiceLog";
+var SELF_SERVICE_LOG_HEADERS = [
+  "Timestamp",
+  "Email",
+  "Action",
+  "QueryText",
+  "QueryMode",
+  "SelectedDeptName",
+  "BudgetOwnerEffective",
+  "MatchedDeptCount",
+  "DateMode",
+  "StartDate",
+  "EndDate",
+  "FiscalYear",
+  "ResultCountRun",
+  "ResultCountSort",
+  "ResultCountExt",
+  "ExportFormat",
+  "TrackingMode",
+  "Status",
+  "UserAgent",
+  "ErrorCode",
+  "ErrorMessage",
+];
+
+function limitSelfServiceLogText(value, maxLength) {
+  return String(value || "").trim().substring(0, maxLength);
+}
+
+function getSelfServiceLogSheet(ss) {
+  return ss.getSheetByName(SELF_SERVICE_LOG_SHEET_NAME);
+}
+
+function appendSelfServiceLog(payload) {
+  try {
+    var ss = getSpreadsheet();
+    var sheet = getSelfServiceLogSheet(ss);
+    if (!sheet) {
+      return { logged: false, logStatus: "failed", reason: "missing_sheet" };
+    }
+
+    var row = [
+      new Date(),
+      normalizeEmail(payload.email),
+      limitSelfServiceLogText(payload.action, 60),
+      limitSelfServiceLogText(payload.queryText, 120),
+      limitSelfServiceLogText(payload.queryMode, 40),
+      limitSelfServiceLogText(payload.selectedDeptName, 160),
+      limitSelfServiceLogText(payload.budgetOwnerEffective, 160),
+      Number(payload.matchedDeptCount || 0),
+      limitSelfServiceLogText(payload.dateMode, 40),
+      limitSelfServiceLogText(payload.startDate, 20),
+      limitSelfServiceLogText(payload.endDate, 20),
+      limitSelfServiceLogText(payload.fiscalYear, 10),
+      Number(payload.resultCountRun || 0),
+      Number(payload.resultCountSort || 0),
+      Number(payload.resultCountExt || 0),
+      limitSelfServiceLogText(payload.exportFormat, 40),
+      limitSelfServiceLogText(payload.trackingMode, 40),
+      limitSelfServiceLogText(payload.status, 20),
+      limitSelfServiceLogText(payload.userAgent, 80),
+      limitSelfServiceLogText(payload.errorCode, 60),
+      limitSelfServiceLogText(payload.errorMessage, 200),
+    ].map(sanitizeInput);
+
+    sheet.appendRow(row);
+    return { logged: true, logStatus: "success" };
+  } catch (err) {
+    console.warn("Self-service log append failed: " + (err.message || err.toString()));
+    return { logged: false, logStatus: "failed", reason: err.message || err.toString() };
+  }
+}
+
+function logSelfServiceEvent(payload) {
+  if (!payload || !payload.action) {
+    return { logged: false, logStatus: "failed", reason: "missing_action" };
+  }
+
+  if (
+    payload.action !== "self_service_otp_verified" &&
+    payload.action !== "self_service_search" &&
+    payload.action !== "self_service_error" &&
+    payload.action !== "self_service_export"
+  ) {
+    return { logged: false, logStatus: "failed", reason: "unsupported_action" };
+  }
+
+  return appendSelfServiceLog(payload);
+}
+
+function writeSelfServiceSessionRecord(
+  sheet,
+  email,
+  otpCode,
+  otpExpires,
+  sessionToken,
+  sessionExpires,
+  failedAttempts,
+  lastRequestedAt,
+) {
+  var values = sheet.getDataRange().getValues();
+  var headers = values[0];
+  var emailIdx = headers.indexOf("Email");
+  var otpCodeIdx = headers.indexOf("OTPCode");
+  var otpExpiresIdx = headers.indexOf("OTPExpiresAt");
+  var tokenIdx = headers.indexOf("SessionToken");
+  var tokenExpiresIdx = headers.indexOf("SessionExpiresAt");
+  var failedAttemptsIdx = headers.indexOf("FailedAttempts");
+  var lastRequestedIdx = headers.indexOf("LastRequestedAt");
+
+  var foundRow = -1;
+  var searchEmail = normalizeEmail(email);
+  for (var i = 1; i < values.length; i++) {
+    if (normalizeEmail(values[i][emailIdx]) === searchEmail) {
+      foundRow = i + 1;
+      break;
+    }
+  }
+
+  if (foundRow === -1) {
+    var newRow = new Array(headers.length);
+    newRow[emailIdx] = email;
+    newRow[otpCodeIdx] = otpCode;
+    newRow[otpExpiresIdx] = otpExpires;
+    newRow[tokenIdx] = sessionToken;
+    newRow[tokenExpiresIdx] = sessionExpires;
+    newRow[failedAttemptsIdx] = failedAttempts || 0;
+    newRow[lastRequestedIdx] = lastRequestedAt;
+    sheet.appendRow(newRow);
+    return;
+  }
+
+  if (otpCode !== null) sheet.getRange(foundRow, otpCodeIdx + 1).setValue(otpCode);
+  if (otpExpires !== null) sheet.getRange(foundRow, otpExpiresIdx + 1).setValue(otpExpires);
+  if (sessionToken !== null) sheet.getRange(foundRow, tokenIdx + 1).setValue(sessionToken);
+  if (sessionExpires !== null) sheet.getRange(foundRow, tokenExpiresIdx + 1).setValue(sessionExpires);
+  if (failedAttempts !== undefined && failedAttempts !== null) {
+    sheet.getRange(foundRow, failedAttemptsIdx + 1).setValue(failedAttempts);
+  }
+  if (lastRequestedAt !== undefined && lastRequestedAt !== null) {
+    sheet.getRange(foundRow, lastRequestedIdx + 1).setValue(lastRequestedAt);
+  }
+}
+
+function verifySelfServiceSessionToken(sessionToken) {
+  if (!sessionToken) {
+    throw new Error("กรุณายืนยันตัวตนด้วย OTP ก่อนค้นหาข้อมูล");
+  }
+
+  var ss = getSpreadsheet();
+  var sheet = ss.getSheetByName("Tx_SelfServiceOTPStore");
+  if (!sheet) {
+    throw new Error("ไม่พบ session สำหรับ self-service");
+  }
+
+  var records = getSheetDataAsObjects(sheet);
+  var record = records.find(function (r) {
+    return r.SessionToken === sessionToken;
+  });
+  if (!record) {
+    throw new Error("session สำหรับ self-service ไม่ถูกต้อง");
+  }
+
+  var now = new Date();
+  var expiresAt = new Date(record.SessionExpiresAt);
+  if (now > expiresAt) {
+    throw new Error("session สำหรับ self-service หมดอายุแล้ว กรุณายืนยัน OTP ใหม่");
+  }
+
+  return { email: record.Email };
+}
+
+function requestSelfServiceOTP(payload) {
+  var email = normalizeEmail(payload && payload.email);
+  if (!email) {
+    throw new Error("กรุณากรอกอีเมลสำหรับรับรหัส OTP");
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new Error("กรุณากรอกรูปแบบอีเมลให้ถูกต้อง");
+  }
+  if (isDisposableEmail(email)) {
+    throw new Error("ไม่อนุญาตให้ใช้อีเมลชั่วคราวสำหรับ self-service");
+  }
+
+  var ss = getSpreadsheet();
+  var sheet = getSelfServiceOtpSheet(ss);
+  var now = new Date();
+  var records = getSheetDataAsObjects(sheet);
+  var record = records.find(function (r) {
+    return normalizeEmail(r.Email) === email;
+  });
+
+  if (record && record.LastRequestedAt) {
+    var lastRequestedAt = new Date(record.LastRequestedAt);
+    var diffMs = now.getTime() - lastRequestedAt.getTime();
+    if (diffMs > 0 && diffMs < 60 * 1000) {
+      var secondsLeft = Math.ceil((60 * 1000 - diffMs) / 1000);
+      throw new Error("กรุณารออีก " + secondsLeft + " วินาทีก่อนขอรหัส OTP ใหม่");
+    }
+  }
+
+  var otpCode = generateSixDigitOTP(email);
+  var otpExpires = new Date(now.getTime() + 15 * 60 * 1000);
+  writeSelfServiceSessionRecord(sheet, email, otpCode, otpExpires, "", new Date(0), 0, now);
+
+  MailApp.sendEmail({
+    to: email,
+    subject: "DCG Smart Service - รหัส OTP สำหรับตรวจสอบข้อมูลหน่วยงาน",
+    htmlBody:
+      "<div style='font-family:sans-serif;padding:20px;max-width:520px;border:1px solid #eee;border-radius:12px'>" +
+      "<h2 style='color:#6A2C70'>DCG Smart Service</h2>" +
+      "<p>รหัส OTP สำหรับตรวจสอบการใช้บริการของหน่วยงานคือ</p>" +
+      "<div style='background:#f7f7fa;padding:16px;border-radius:8px;text-align:center;margin:18px 0'>" +
+      "<span style='font-size:32px;font-weight:bold;letter-spacing:6px;color:#4F46E5'>" +
+      otpCode +
+      "</span></div>" +
+      "<p style='font-size:12px;color:#666'>รหัสนี้หมดอายุใน 15 นาที และ session หลังยืนยันสำเร็จจะใช้ได้ถึงวันศุกร์ของสัปดาห์นี้</p>" +
+      "</div>",
+  });
+
+  return { message: "ส่งรหัส OTP ไปยังอีเมล " + email + " แล้ว" };
+}
+
+function verifySelfServiceOTP(payload) {
+  var email = normalizeEmail(payload && payload.email);
+  var code = payload && payload.code ? String(payload.code).trim() : "";
+  if (!email || !code) {
+    throw new Error("กรุณากรอกอีเมลและรหัส OTP ให้ครบถ้วน");
+  }
+
+  var ss = getSpreadsheet();
+  var sheet = getSelfServiceOtpSheet(ss);
+  var records = getSheetDataAsObjects(sheet);
+  var record = records.find(function (r) {
+    return normalizeEmail(r.Email) === email;
+  });
+  if (!record) {
+    throw new Error("ไม่พบรายการขอรหัส OTP สำหรับอีเมลนี้");
+  }
+
+  if (String(record.OTPCode).trim() !== code) {
+    var failedAttempts = Number(record.FailedAttempts || 0) + 1;
+    if (failedAttempts >= 5) {
+      writeSelfServiceSessionRecord(sheet, email, "", new Date(0), null, null, 0, null);
+      throw new Error("รหัส OTP ถูกระงับเนื่องจากกรอกผิดเกิน 5 ครั้ง กรุณาขอรหัสใหม่");
+    }
+    writeSelfServiceSessionRecord(sheet, email, null, null, null, null, failedAttempts, null);
+    throw new Error("รหัส OTP ไม่ถูกต้อง");
+  }
+
+  var now = new Date();
+  var otpExpires = new Date(record.OTPExpiresAt);
+  if (now > otpExpires) {
+    throw new Error("รหัส OTP หมดอายุแล้ว กรุณาขอรหัสใหม่");
+  }
+
+  var sessionToken =
+    "SS-" +
+    Utilities.getUuid().replace(/-/g, "").substring(0, 24).toUpperCase();
+  var sessionExpires = getFridayEndOfWeek(now);
+  writeSelfServiceSessionRecord(sheet, email, "", new Date(0), sessionToken, sessionExpires, 0, null);
+  var logResult = appendSelfServiceLog({
+    email: email,
+    action: "self_service_otp_verified",
+    status: "success",
+  });
+
+  return {
+    email: email,
+    sessionToken: sessionToken,
+    sessionExpiresAt: sessionExpires,
+    logStatus: logResult.logStatus,
+  };
+}
+
+function selfServiceSearch(payload, auth) {
+  var token = auth && auth.selfServiceSessionToken;
+  var sessionUser = verifySelfServiceSessionToken(token);
+  var result = publicSearch(payload);
+  var meta = result.meta || {};
+  var logResult = appendSelfServiceLog({
+    email: sessionUser.email,
+    action: "self_service_search",
+    queryText: payload && payload.deptName,
+    queryMode: meta.queryMode,
+    selectedDeptName: meta.deptName,
+    budgetOwnerEffective: meta.budgetOwner,
+    matchedDeptCount: meta.matchedDepartments ? meta.matchedDepartments.length : 0,
+    dateMode: payload && payload.dateMode,
+    startDate: payload && payload.startDate,
+    endDate: payload && payload.endDate,
+    fiscalYear: payload && payload.fiscalYear,
+    resultCountRun: result.run ? result.run.length : 0,
+    resultCountSort: result.sort ? result.sort.length : 0,
+    resultCountExt: result.ext ? result.ext.length : 0,
+    trackingMode: "masked",
+    status: "success",
+    userAgent: payload && payload.userAgent,
+  });
+  if (!result.meta) result.meta = {};
+  result.meta.logStatus = logResult.logStatus;
+  return result;
+}
+
+function maskPublicTrackingNo(trackingNo) {
+  var value = String(trackingNo || "").trim();
+  if (!value || value === "-") return "-";
+  if (value.length <= 8) return value.substring(0, 2) + "***";
+  return value.substring(0, 5) + "***" + value.substring(value.length - 4);
+}
+
+function normalizePublicFundSource(fundSource) {
+  var value = String(fundSource || "").trim();
+  if (value === "งบประมาณส่วนกลาง" || value === "งบประมาณมหาวิทยาลัย") {
+    return "งบประมาณมหาวิทยาลัย";
+  }
+  if (value === "งบโครงการ" || value === "งบประมาณโครงการ") {
+    return "งบประมาณโครงการ";
+  }
+  if (value === "งบวิสาหกิจ" || value === "งบประมาณวิสาหกิจ") {
+    return "งบประมาณวิสาหกิจ";
+  }
+  return "งบประมาณมหาวิทยาลัย";
+}
+
 function publicSearch(payload) {
   var deptName = payload.deptName;
   if (!deptName) {
     return { run: [], sort: [], ext: [] };
+  }
+  var deptNames = [deptName];
+  if (payload.matchedDepartments && payload.matchedDepartments.length) {
+    deptNames = payload.matchedDepartments
+      .map(function (name) {
+        return String(name || "").trim();
+      })
+      .filter(function (name) {
+        return name !== "";
+      });
   }
 
   var ss = getSpreadsheet();
@@ -837,9 +1263,10 @@ function publicSearch(payload) {
 
       for (var i = 1; i < data.length; i++) {
         var row = data[i];
-        if (row[deptIdx] === deptName) {
+        if (deptNames.indexOf(row[deptIdx]) !== -1) {
           runResults.push({
             date: formatTimestamp(row[timeIdx]),
+            dept: row[deptIdx],
             route: row[routeIdx] || "สายส่งทั่วไป",
             round: row[roundIdx] || "รอบทั่วไป",
             count: row[countIdx] || 0,
@@ -866,9 +1293,10 @@ function publicSearch(payload) {
 
       for (var i = 1; i < data.length; i++) {
         var row = data[i];
-        if (row[deptIdx] === deptName) {
+        if (deptNames.indexOf(row[deptIdx]) !== -1) {
           sortResults.push({
             date: formatTimestamp(row[timeIdx]),
+            dept: row[deptIdx],
             normal: row[normalIdx] || 0,
             register: row[regIdx] || 0,
             private: privateIdx > -1 ? row[privateIdx] || 0 : 0,
@@ -896,13 +1324,14 @@ function publicSearch(payload) {
 
       for (var i = 1; i < data.length; i++) {
         var row = data[i];
-        if (row[deptIdx] === deptName) {
+        if (deptNames.indexOf(row[deptIdx]) !== -1) {
           extResults.push({
             date: formatTimestamp(row[timeIdx]),
+            dept: row[deptIdx],
             service: row[serviceIdx] || "ทั่วไป",
             cost: row[costIdx] || 0,
             count: row[countIdx] || 0,
-            tracking: row[trackIdx] || "-",
+            tracking: maskPublicTrackingNo(row[trackIdx]),
             fund: row[fundIdx] || "งบประมาณหน่วยงาน",
           });
         }
@@ -914,6 +1343,12 @@ function publicSearch(payload) {
     run: runResults,
     sort: sortResults,
     ext: extResults,
+    meta: {
+      queryMode: payload.queryMode || "department",
+      deptName: deptName,
+      budgetOwner: payload.budgetOwner || deptName,
+      matchedDepartments: deptNames,
+    },
   };
 }
 

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Truck, Mail, Package, FileText, Globe } from 'lucide-react';
+export { FUND_SOURCES } from '../utils/fundSource';
 
-export const FUND_SOURCES = ["งบประมาณมหาวิทยาลัย", "งบประมาณวิสาหกิจ", "งบประมาณโครงการ"];
 export const RUN_SAVING_PER_UNIT = 45;
 
 export const THEMES: Record<string, any> = {

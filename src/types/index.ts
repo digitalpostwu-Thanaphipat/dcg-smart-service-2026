@@ -10,6 +10,7 @@ export interface Department {
     DeptName: string;
     RouteGroup: string;
     Building?: string;
+    Floor?: string | number;
     BudgetOwner?: string;
 }
 

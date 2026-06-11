@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { GlassCard } from '../shared/GlassCard';
 import { LogItem } from '../../types';
-import { FUND_SOURCES } from '../../lib/constants';
+import { summarizeFundsBySource } from '../../utils/fundSource';
 import { motion } from 'framer-motion';
 import { Package, Banknote } from 'lucide-react';
 
@@ -24,20 +24,7 @@ export const ExtReport: React.FC<ExtReportProps> = ({ logs }) => {
     const totalCost = extLogs.reduce((sum, l) => sum + (l.cost || 0), 0);
 
     // จัดกลุ่มตามแหล่งงบประมาณ
-    const fundBreakdown: Record<string, { items: number; cost: number; depts: Set<string> }> = {};
-    FUND_SOURCES.forEach(fund => {
-      fundBreakdown[fund] = { items: 0, cost: 0, depts: new Set() };
-    });
-
-    extLogs.forEach(l => {
-      const fund = l.fund || 'งบประมาณมหาวิทยาลัย';
-      if (!fundBreakdown[fund]) {
-        fundBreakdown[fund] = { items: 0, cost: 0, depts: new Set() };
-      }
-      fundBreakdown[fund].items += l.count || 0;
-      fundBreakdown[fund].cost += l.cost || 0;
-      fundBreakdown[fund].depts.add(l.dept);
-    });
+    const fundBreakdown = summarizeFundsBySource(extLogs);
 
     const funds = Object.entries(fundBreakdown)
       .map(([name, data]) => ({

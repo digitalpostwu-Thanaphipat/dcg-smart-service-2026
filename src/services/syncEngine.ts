@@ -7,6 +7,7 @@ import {
 import { useAppStore } from '../store/useAppStore';
 import { LogItem } from '../types';
 import { toast } from 'sonner';
+import { generateTxId } from './txId';
 
 export const syncEngine = {
   // Sync all pending logs from IndexedDB to the API
@@ -93,17 +94,8 @@ export const syncEngine = {
   saveTransaction: async (type: 'run' | 'sort' | 'ext', items: any[], common: any) => {
     const store = useAppStore.getState();
     
-    // Generate unique ID and timestamp in the old style: PREFIX-YYYYMMDD-RAND4
-    const prefix = type.toUpperCase();
     const now = new Date();
-    const yyyy = now.getFullYear();
-    const mm = String(now.getMonth() + 1).padStart(2, '0');
-    const dd = String(now.getDate()).padStart(2, '0');
-    const dateStr = `${yyyy}${mm}${dd}`;
-    const rand = Array.from({ length: 4 }, () => 
-      'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'.charAt(Math.floor(Math.random() * 36))
-    ).join('');
-    const txId = `${prefix}-${dateStr}-${rand}`;
+    const txId = generateTxId(type, now);
     const timestampStr = now.toISOString().replace('T', ' ').substring(0, 19);
 
     // Format description and calculations
@@ -156,6 +148,7 @@ export const syncEngine = {
       store.setSyncQueueCount(currentPending.length);
     } catch (e) {
       console.error("Failed to save log to IndexedDB:", e);
+      throw e;
     }
 
     // Prepend to store state optimistically

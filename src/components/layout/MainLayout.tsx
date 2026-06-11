@@ -14,9 +14,10 @@ import { FeedbackButton } from '../common/FeedbackButton';
 
 interface MainLayoutProps {
   children: React.ReactNode;
+  onRefreshMasterData?: () => void;
 }
 
-export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
+export const MainLayout: React.FC<MainLayoutProps> = ({ children, onRefreshMasterData }) => {
   const { 
     currentUser, 
     setCurrentUser, 
@@ -185,6 +186,17 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
               </button>
             )}
           </div>
+
+          {onRefreshMasterData && (
+            <button
+              type="button"
+              onClick={onRefreshMasterData}
+              className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-slate-200/70 bg-white/50 px-3 py-2 text-[10px] font-bold text-slate-600 transition-all hover:bg-white dark:border-white/5 dark:bg-slate-900/40 dark:text-slate-300 dark:hover:bg-slate-800/60"
+            >
+              <RefreshCw size={12} />
+              Reload master data
+            </button>
+          )}
 
           {/* Navigation Items (PC Layout) */}
           <nav className="space-y-1.5" role="tablist" aria-label="เมนูหลักการดำเนินงาน">

@@ -1,11 +1,41 @@
 import { Department } from '../types';
 
-export const getDeptDisplay = (dept: Department) => dept.Building ? `${dept.DeptName} (${dept.Building})` : dept.DeptName;
+const normalizeText = (value: unknown) => String(value ?? '').trim();
+
+export const getDeptLocationDisplay = (dept: Department) => {
+    const building = normalizeText(dept.Building);
+    const floor = normalizeText(dept.Floor);
+
+    if (building && floor) return `${building} ชั้น ${floor}`;
+    if (building) return building;
+    if (floor) return `ชั้น ${floor}`;
+    return '';
+};
+
+export const getDeptDisplay = (dept: Department) => {
+    const location = getDeptLocationDisplay(dept);
+    return location ? `${dept.DeptName} (${location})` : dept.DeptName;
+};
+
+export const getBudgetOwnerEffective = (dept: Department) => normalizeText(dept.BudgetOwner) || dept.DeptName;
 
 export const getRealOwner = (deptName: string, departments?: Department[]) => {
     if (!departments) return deptName;
     const dept = departments.find(d => d.DeptName === deptName);
-    return dept?.BudgetOwner || deptName;
+    return dept ? getBudgetOwnerEffective(dept) : deptName;
+};
+
+export const departmentMatchesSearch = (dept: Department, query: string) => {
+    const q = normalizeText(query).toLowerCase();
+    if (!q) return true;
+
+    return [
+        dept.DeptName,
+        dept.Building,
+        dept.Floor,
+        `ชั้น ${normalizeText(dept.Floor)}`,
+        getBudgetOwnerEffective(dept),
+    ].some(value => normalizeText(value).toLowerCase().includes(q));
 };
 
 const formatLocalDate = (date: Date) => {

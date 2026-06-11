@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const useWebServer = process.env.PLAYWRIGHT_SKIP_WEBSERVER !== '1';
+
 export default defineConfig({
   testDir: './e2e',
   timeout: 60000,
@@ -18,10 +20,10 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  webServer: {
-    command: 'npx --yes vite --port 5175 --strictPort --host 127.0.0.1',
+  ...(useWebServer ? { webServer: {
+    command: 'node ./node_modules/vite/bin/vite.js --port 5175 --strictPort --host 127.0.0.1',
     url: 'http://127.0.0.1:5175',
     reuseExistingServer: !process.env.CI,
     timeout: 30000,
-  },
+  } } : {}),
 });

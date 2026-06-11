@@ -1,9 +1,20 @@
 import React, { useState } from 'react';
+import * as XLSX from 'xlsx';
 import { useAppStore } from '../../store/useAppStore';
 import { api } from '../../services/api';
-import { Search, MapPin, Inbox, Globe, ArrowLeft, Link } from 'lucide-react';
+import { Search, MapPin, Inbox, Globe, ArrowLeft, Link, Mail, ShieldCheck, AlertCircle, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import SmartSearchInput from '../common/SmartSearchInput';
+import {
+  SelfServiceQueryMode,
+  buildSelfServiceErrorLogPayload,
+  buildSelfServiceExportFileName,
+  buildSelfServiceExportSheets,
+  maskTrackingNumber,
+  resolveSelfServiceSelection,
+  summarizeUserAgent,
+  summarizePublicExtByFund,
+} from '../../utils/selfService';
 
 interface PublicTrackViewProps {
   onBack: () => void;
@@ -11,6 +22,10 @@ interface PublicTrackViewProps {
 }
 
 type ServiceTab = 'run' | 'sort' | 'ext';
+
+const SELF_SERVICE_TOKEN_KEY = 'dcg_self_service_session_token';
+const SELF_SERVICE_EMAIL_KEY = 'dcg_self_service_email';
+const SELF_SERVICE_EXPORT_COUNT_KEY = 'dcg_self_service_export_count';
 
 const formatDateLocal = (date: Date) => {
   const y = date.getFullYear();
@@ -20,11 +35,21 @@ const formatDateLocal = (date: Date) => {
 };
 
 export const PublicTrackView: React.FC<PublicTrackViewProps> = ({ onBack, initialDept }) => {
-  const { masterData, setLoading } = useAppStore();
+  const { masterData, setMasterData, setLoading } = useAppStore();
   const [publicSearchDept, setPublicSearchDept] = useState('');
+  const [selfServiceEmail, setSelfServiceEmail] = useState(() => localStorage.getItem(SELF_SERVICE_EMAIL_KEY) || '');
+  const [selfServiceToken, setSelfServiceToken] = useState(() => localStorage.getItem(SELF_SERVICE_TOKEN_KEY) || '');
+  const [selfServiceOtpCode, setSelfServiceOtpCode] = useState('');
+  const [selfServiceOtpSent, setSelfServiceOtpSent] = useState(false);
+  const [selfServiceCooldown, setSelfServiceCooldown] = useState(0);
+  const [selfServiceMessage, setSelfServiceMessage] = useState('');
+  const [selfServiceError, setSelfServiceError] = useState('');
+  const [queryMode, setQueryMode] = useState<SelfServiceQueryMode>('department');
+  const [selectedContext, setSelectedContext] = useState<ReturnType<typeof resolveSelfServiceSelection>>(null);
   const [activeTab, setActiveTab] = useState<ServiceTab>('run');
   const [hasSearched, setHasSearched] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [exportCount, setExportCount] = useState(() => Number(sessionStorage.getItem(SELF_SERVICE_EXPORT_COUNT_KEY) || 0));
   
   const [publicStartDate, setPublicStartDate] = useState(
     formatDateLocal(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
@@ -44,6 +69,36 @@ export const PublicTrackView: React.FC<PublicTrackViewProps> = ({ onBack, initia
   const isToday = publicStartDate === todayStr && publicEndDate === todayStr;
   const isMonth = publicStartDate === firstDayStr && publicEndDate === todayStr;
   const isFiscal = publicStartDate === fiscalYearStartStr && publicEndDate === fiscalYearEndStr;
+  const currentDateMode = isToday ? 'today' : isMonth ? 'month' : isFiscal ? 'fiscal_year' : 'custom';
+  const fiscalYearLabel = String(fiscalYear + 544);
+
+  React.useEffect(() => {
+    if (selfServiceCooldown <= 0) return;
+    const timer = window.setTimeout(() => setSelfServiceCooldown(selfServiceCooldown - 1), 1000);
+    return () => window.clearTimeout(timer);
+  }, [selfServiceCooldown]);
+
+  React.useEffect(() => {
+    if (masterData?.departments?.length) return;
+
+    let cancelled = false;
+    api.fetchPublicMetaData()
+      .then((json) => {
+        if (cancelled || json.status !== 'success') return;
+        setMasterData({
+          users: [],
+          departments: json.data?.departments || [],
+          services: json.data?.services || [],
+        });
+      })
+      .catch((err) => {
+        console.warn('Failed to fetch public metadata:', err);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [masterData, setMasterData]);
 
   const setPresetToday = () => {
     setPublicStartDate(todayStr);
@@ -99,16 +154,100 @@ export const PublicTrackView: React.FC<PublicTrackViewProps> = ({ onBack, initia
   const [runData, setRunData] = useState<any[]>([]);
   const [sortData, setSortData] = useState<any[]>([]);
   const [extData, setExtData] = useState<any[]>([]);
+  const filteredRunData = filterByDateRange(runData);
+  const filteredSortData = filterByDateRange(sortData);
+  const filteredExtData = filterByDateRange(extData);
+  const extFundSummary = summarizePublicExtByFund(filteredExtData);
+
+  const handleRequestSelfServiceOTP = async (e?: React.FormEvent | React.MouseEvent) => {
+    e?.preventDefault();
+    setSelfServiceError('');
+    setSelfServiceMessage('');
+
+    const trimmedEmail = selfServiceEmail.trim().toLowerCase();
+    if (!trimmedEmail) {
+      setSelfServiceError('กรุณากรอกอีเมลสำหรับรับรหัส OTP');
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setSelfServiceError('กรุณากรอกรูปแบบอีเมลให้ถูกต้อง');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await api.requestSelfServiceOTP(trimmedEmail);
+      setSelfServiceOtpSent(true);
+      setSelfServiceCooldown(60);
+      setSelfServiceMessage(res.data?.message || `ส่งรหัส OTP ไปยัง ${trimmedEmail} แล้ว`);
+    } catch (err: any) {
+      setSelfServiceError(err.message || 'ไม่สามารถขอรหัส OTP ได้');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifySelfServiceOTP = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSelfServiceError('');
+    setSelfServiceMessage('');
+
+    const trimmedEmail = selfServiceEmail.trim().toLowerCase();
+    const trimmedCode = selfServiceOtpCode.trim();
+    if (!trimmedCode) {
+      setSelfServiceError('กรุณากรอกรหัส OTP 6 หลัก');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await api.verifySelfServiceOTP(trimmedEmail, trimmedCode);
+      const token = res.data?.sessionToken;
+      if (!token) {
+        throw new Error('ไม่พบ session สำหรับ self-service จากระบบ');
+      }
+      localStorage.setItem(SELF_SERVICE_TOKEN_KEY, token);
+      localStorage.setItem(SELF_SERVICE_EMAIL_KEY, trimmedEmail);
+      setSelfServiceToken(token);
+      setSelfServiceEmail(trimmedEmail);
+      setSelfServiceMessage('ยืนยันตัวตนสำเร็จ สามารถค้นหาข้อมูลหน่วยงานได้แล้ว');
+    } catch (err: any) {
+      setSelfServiceError(err.message || 'รหัส OTP ไม่ถูกต้องหรือหมดอายุ');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const performSearch = async (dept: string) => {
     if (!dept) return;
+    if (!selfServiceToken) {
+      toast.warning('กรุณายืนยันตัวตนด้วย OTP ก่อนค้นหาข้อมูล');
+      return;
+    }
+    const selection = resolveSelfServiceSelection(masterData?.departments || [], dept, queryMode);
+    if (!selection) {
+      toast.warning('กรุณาเลือกหน่วยงานจากรายการที่ระบบแนะนำก่อนดูรายงาน');
+      return;
+    }
+
     setLoading(true);
     setHasSearched(false);
     
     try {
-      const json = await api.publicSearch(dept);
+      const json = await api.publicSearch(selection.deptName, selfServiceToken, {
+        queryMode: selection.queryMode,
+        budgetOwner: selection.budgetOwner,
+        matchedDepartments: selection.matchedDepartments,
+        dateMode: currentDateMode,
+        startDate: publicStartDate,
+        endDate: publicEndDate,
+        fiscalYear: fiscalYearLabel,
+        userAgent: summarizeUserAgent(navigator.userAgent),
+      });
       if (json.status === 'success') {
         const rawData = json.data;
+        setSelectedContext(selection);
         
         // Check if API returned structured data or flat list
         if (rawData && typeof rawData === 'object' && !Array.isArray(rawData)) {
@@ -159,17 +298,124 @@ export const PublicTrackView: React.FC<PublicTrackViewProps> = ({ onBack, initia
         }
         setHasSearched(true);
       } else {
+        api.logSelfServiceEvent(buildSelfServiceErrorLogPayload({
+          email: selfServiceEmail,
+          queryText: dept,
+          queryMode,
+          selectedDeptName: selection.deptName,
+          budgetOwner: selection.budgetOwner,
+          matchedDeptCount: selection.matchedDepartments.length,
+          dateMode: currentDateMode,
+          startDate: publicStartDate,
+          endDate: publicEndDate,
+          fiscalYear: fiscalYearLabel,
+          userAgent: navigator.userAgent,
+          errorCode: 'SEARCH_ERROR_RESPONSE',
+          errorMessage: json.message || 'Self-service search returned an error response',
+        }), selfServiceToken);
         toast.error('เกิดข้อผิดพลาด', {
           description: json.message || 'ไม่สามารถดึงข้อมูลได้',
         });
       }
     } catch (e: any) {
       console.error(e);
+      api.logSelfServiceEvent(buildSelfServiceErrorLogPayload({
+        email: selfServiceEmail,
+        queryText: dept,
+        queryMode,
+        selectedDeptName: selection.deptName,
+        budgetOwner: selection.budgetOwner,
+        matchedDeptCount: selection.matchedDepartments.length,
+        dateMode: currentDateMode,
+        startDate: publicStartDate,
+        endDate: publicEndDate,
+        fiscalYear: fiscalYearLabel,
+        userAgent: navigator.userAgent,
+        errorCode: 'SEARCH_FAILED',
+        errorMessage: String(e.message || e),
+      }), selfServiceToken);
       toast.error('เกิดข้อผิดพลาดในการเชื่อมต่อ', {
         description: String(e.message || e),
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleExportExcel = async () => {
+    if (!hasSearched || !selectedContext) {
+      toast.warning('กรุณาค้นหาข้อมูลก่อน export');
+      return;
+    }
+    if (exportCount >= 10) {
+      toast.warning('export ครบ 10 ครั้งใน session นี้แล้ว กรุณายืนยัน OTP ใหม่หรือ refresh หน้า');
+      return;
+    }
+
+    const payloadBase = {
+      email: selfServiceEmail,
+      queryText: selectedContext.deptName,
+      queryMode: selectedContext.queryMode,
+      selectedDeptName: selectedContext.deptName,
+      budgetOwnerEffective: selectedContext.budgetOwner,
+      matchedDeptCount: selectedContext.matchedDepartments.length,
+      dateMode: currentDateMode,
+      startDate: publicStartDate,
+      endDate: publicEndDate,
+      fiscalYear: fiscalYearLabel,
+      resultCountRun: filteredRunData.length,
+      resultCountSort: filteredSortData.length,
+      resultCountExt: filteredExtData.length,
+      exportFormat: 'xlsx',
+      trackingMode: 'masked',
+      userAgent: summarizeUserAgent(navigator.userAgent),
+    };
+
+    try {
+      const sheets = buildSelfServiceExportSheets({
+        email: selfServiceEmail,
+        deptName: selectedContext.deptName,
+        queryMode: selectedContext.queryMode,
+        budgetOwner: selectedContext.budgetOwner,
+        matchedDeptCount: selectedContext.matchedDepartments.length,
+        startDate: publicStartDate,
+        endDate: publicEndDate,
+        fiscalYear: fiscalYearLabel,
+        exportedAt: new Date().toLocaleString('th-TH'),
+        runData: filteredRunData,
+        sortData: filteredSortData,
+        extData: filteredExtData,
+      });
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(sheets.summary), 'สรุป');
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(sheets.run), 'รับ-ส่งภายใน');
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(sheets.sort), 'คัดแยก-นำจ่าย');
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(sheets.ext), 'นำส่งภายนอก');
+      XLSX.writeFile(workbook, buildSelfServiceExportFileName(selectedContext.deptName, publicStartDate, publicEndDate));
+
+      const nextExportCount = exportCount + 1;
+      setExportCount(nextExportCount);
+      sessionStorage.setItem(SELF_SERVICE_EXPORT_COUNT_KEY, String(nextExportCount));
+      api.logSelfServiceEvent({
+        ...payloadBase,
+        action: 'self_service_export',
+        status: 'success',
+        errorCode: '',
+        errorMessage: '',
+      }, selfServiceToken);
+      toast.success('export Excel สำเร็จ');
+    } catch (err: any) {
+      api.logSelfServiceEvent({
+        ...payloadBase,
+        action: 'self_service_export',
+        status: 'error',
+        errorCode: 'EXPORT_FAILED',
+        errorMessage: String(err.message || err),
+      }, selfServiceToken);
+      toast.error('export Excel ไม่สำเร็จ', {
+        description: String(err.message || err),
+      });
     }
   };
 
@@ -182,9 +428,11 @@ export const PublicTrackView: React.FC<PublicTrackViewProps> = ({ onBack, initia
     if (initialDept) {
       const decodedDept = decodeURIComponent(initialDept);
       setPublicSearchDept(decodedDept);
-      performSearch(decodedDept);
+      if (selfServiceToken) {
+        performSearch(decodedDept);
+      }
     }
-  }, [initialDept]);
+  }, [initialDept, selfServiceToken]);
 
   return (
     <div className="animate-in fade-in slide-in-from-right duration-300 space-y-5">
@@ -203,14 +451,119 @@ export const PublicTrackView: React.FC<PublicTrackViewProps> = ({ onBack, initia
       </div>
 
       <div className="text-left space-y-2">
+        {!selfServiceToken && (
+          <div className="mb-5 space-y-4 rounded-2xl border border-purple-200 bg-purple-50/70 p-4 text-left dark:border-purple-500/20 dark:bg-purple-950/20">
+            <div className="flex items-start gap-3">
+              <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-purple-600 dark:text-purple-300" />
+              <div>
+                <h4 className="text-sm font-extrabold text-slate-900 dark:text-white">ยืนยันตัวตนก่อนตรวจสอบข้อมูล</h4>
+                <p className="mt-1 text-xs leading-relaxed text-slate-600 dark:text-slate-400">
+                  ใช้อีเมลของท่านเพื่อรับรหัส OTP แล้วจึงค้นหาการใช้บริการของหน่วยงานได้
+                </p>
+              </div>
+            </div>
+
+            {!selfServiceOtpSent ? (
+              <form onSubmit={handleRequestSelfServiceOTP} className="space-y-3">
+                <div className="relative">
+                  <input
+                    type="email"
+                    value={selfServiceEmail}
+                    onChange={(e) => setSelfServiceEmail(e.target.value)}
+                    placeholder="กรอกอีเมลเพื่อรับ OTP"
+                    className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-10 pr-3 text-sm text-slate-800 outline-none transition-shadow focus:ring-2 focus:ring-purple-500 dark:border-white/10 dark:bg-slate-900/60 dark:text-white"
+                  />
+                  <Mail className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-400" />
+                </div>
+                <button
+                  type="submit"
+                  className="w-full rounded-xl bg-purple-600 px-4 py-3 text-xs font-bold text-white transition-all hover:bg-purple-700 active:scale-95"
+                >
+                  ขอรหัส OTP
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleVerifySelfServiceOTP} className="space-y-3">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={6}
+                  value={selfServiceOtpCode}
+                  onChange={(e) => setSelfServiceOtpCode(e.target.value.replace(/[^0-9]/g, ''))}
+                  placeholder="กรอกรหัส 6 หลัก"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-center text-lg font-black tracking-[0.4em] text-slate-900 outline-none transition-shadow focus:ring-2 focus:ring-purple-500 dark:border-white/10 dark:bg-slate-900/60 dark:text-white"
+                />
+                <button
+                  type="submit"
+                  className="w-full rounded-xl bg-purple-600 px-4 py-3 text-xs font-bold text-white transition-all hover:bg-purple-700 active:scale-95"
+                >
+                  ยืนยัน OTP
+                </button>
+                <div className="text-center">
+                  {selfServiceCooldown > 0 ? (
+                    <p className="text-[10px] font-semibold text-slate-500">ขอรหัสใหม่ได้ในอีก {selfServiceCooldown} วินาที</p>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleRequestSelfServiceOTP}
+                      className="rounded px-2 py-1 text-[10px] font-bold text-purple-600 hover:underline dark:text-purple-300"
+                    >
+                      ส่งรหัส OTP อีกครั้ง
+                    </button>
+                  )}
+                </div>
+              </form>
+            )}
+
+            {selfServiceError && (
+              <div className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{selfServiceError}</span>
+              </div>
+            )}
+            {selfServiceMessage && (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-semibold text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200">
+                {selfServiceMessage}
+              </div>
+            )}
+          </div>
+        )}
         <label className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-widest block">
           หน่วยงานของท่าน
         </label>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => setQueryMode('department')}
+            className={`rounded-xl border px-3 py-2 text-[11px] font-bold transition-all ${
+              queryMode === 'department'
+                ? 'border-purple-500 bg-purple-600 text-white'
+                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-300'
+            }`}
+          >
+            เฉพาะหน่วยงานที่เลือก
+          </button>
+          <button
+            type="button"
+            onClick={() => setQueryMode('budget_owner')}
+            className={`rounded-xl border px-3 py-2 text-[11px] font-bold transition-all ${
+              queryMode === 'budget_owner'
+                ? 'border-purple-500 bg-purple-600 text-white'
+                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-300'
+            }`}
+          >
+            รวมต้นสังกัดงบประมาณ
+          </button>
+        </div>
         <div className="flex gap-2">
           <div className="flex-1">
             <SmartSearchInput
               value={publicSearchDept}
-              onChange={setPublicSearchDept}
+              onChange={(value) => {
+                setPublicSearchDept(value);
+                setSelectedContext(null);
+              }}
               placeholder="พิมพ์ชื่อหน่วยงานของท่าน..."
               departments={masterData?.departments || []}
               themeColor="text-purple-500"
@@ -218,13 +571,22 @@ export const PublicTrackView: React.FC<PublicTrackViewProps> = ({ onBack, initia
           </div>
           <button
             onClick={handlePublicSearch}
-            className="px-5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold shadow-md shadow-purple-950/10 dark:shadow-none flex items-center gap-2 transition-all active:scale-95 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-purple-500 dark:focus-visible:ring-orange-500 focus-visible:outline-none"
+            disabled={!selfServiceToken}
+            className="px-5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold shadow-md shadow-purple-950/10 dark:shadow-none flex items-center gap-2 transition-all active:scale-95 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-purple-500 dark:focus-visible:ring-orange-500 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Search size={16} /> ค้นหา
           </button>
         </div>
         {hasSearched && (
-          <div className="flex justify-end pt-1">
+          <div className="flex flex-wrap justify-end gap-2 pt-1">
+            <button
+              onClick={handleExportExcel}
+              disabled={!selectedContext || exportCount >= 10}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 rounded-xl text-[10px] font-bold border border-emerald-200 dark:border-emerald-500/20 transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-emerald-500 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Download size={12} />
+              Export Excel ({exportCount}/10)
+            </button>
             <button
               onClick={handleCopyLink}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/40 dark:hover:bg-slate-700/60 text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 rounded-xl text-[10px] font-bold border border-slate-200 dark:border-white/5 transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-purple-500 dark:focus-visible:ring-orange-500 focus-visible:outline-none"
@@ -238,6 +600,27 @@ export const PublicTrackView: React.FC<PublicTrackViewProps> = ({ onBack, initia
 
       {hasSearched && (
         <div className="space-y-4 animate-in fade-in slide-in-from-bottom duration-350">
+          {selectedContext && (
+            <div className="rounded-2xl border border-slate-200 bg-white/70 p-3.5 text-left text-xs text-slate-700 dark:border-white/5 dark:bg-slate-900/40 dark:text-slate-300">
+              <div className="font-extrabold text-slate-900 dark:text-white">
+                {selectedContext.queryMode === 'budget_owner'
+                  ? `ต้นสังกัดงบประมาณ: ${selectedContext.budgetOwner}`
+                  : `หน่วยงาน: ${selectedContext.deptName}`}
+              </div>
+              {selectedContext.queryMode === 'budget_owner' && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {selectedContext.matchedDepartments.map((deptName) => (
+                    <span
+                      key={deptName}
+                      className="rounded-full bg-purple-50 px-2.5 py-1 text-[10px] font-bold text-purple-700 dark:bg-purple-500/10 dark:text-purple-200"
+                    >
+                      {deptName}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           {/* Date Range Calendar Selector */}
           <div className="space-y-1.5 text-left bg-slate-100 dark:bg-slate-950/20 p-3.5 rounded-2xl border border-slate-200 dark:border-white/5">
             <label className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-widest block mb-1">
@@ -401,8 +784,22 @@ export const PublicTrackView: React.FC<PublicTrackViewProps> = ({ onBack, initia
 
             {activeTab === 'ext' && (
               <div id="panel-ext" role="tabpanel" aria-labelledby="tab-ext">
-                {filterByDateRange(extData).length > 0 ? (
-                  filterByDateRange(extData).map((item, idx) => (
+                {filteredExtData.length > 0 ? (
+                  <>
+                    <div className="mb-3 grid gap-2">
+                      {Object.entries(extFundSummary).map(([fundName, data]) => (
+                        <div
+                          key={fundName}
+                          className="rounded-xl border border-emerald-100 bg-emerald-50/70 px-3 py-2 text-xs dark:border-emerald-500/20 dark:bg-emerald-500/10"
+                        >
+                          <div className="font-bold text-emerald-700 dark:text-emerald-200">{fundName}</div>
+                          <div className="mt-0.5 text-slate-600 dark:text-slate-300">
+                            {data.items.toLocaleString()} ชิ้น · {data.cost.toLocaleString()} บาท
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {filteredExtData.map((item, idx) => (
                     <div key={idx} className="bg-white/50 dark:bg-slate-800/30 border border-slate-200 dark:border-white/5 hover:border-slate-300 dark:hover:border-white/10 p-3.5 rounded-2xl text-xs space-y-1.5 transition-all">
                       <div className="flex justify-between items-start">
                         <span className="font-bold text-slate-800 dark:text-white text-sm">ส่งไปรษณีย์ออกไปภายนอกองค์กร</span>
@@ -414,11 +811,12 @@ export const PublicTrackView: React.FC<PublicTrackViewProps> = ({ onBack, initia
                         <div>• <strong>จำนวนนำส่ง:</strong> <span className="text-slate-800 dark:text-white font-bold">{item.count}</span> ชิ้น</div>
                         <div>• <strong>ค่าบริการ:</strong> <span className="text-slate-800 dark:text-white font-bold">{item.cost}</span> บาท</div>
                         <div>• <strong>แหล่งงบประมาณ:</strong> <span className="text-emerald-600 dark:text-emerald-400 font-bold">{item.fund}</span></div>
-                        <div>• <strong>หมายเลขติดตาม (Tracking):</strong> <span className="text-slate-700 dark:text-slate-300 font-mono">{item.tracking}</span> <span className="text-[9px] text-slate-600 dark:text-slate-400 font-normal">(รอการพัฒนาในเฟสถัดไป)</span></div>
+                        <div>• <strong>หมายเลขติดตาม (Tracking):</strong> <span className="text-slate-700 dark:text-slate-300 font-mono">{maskTrackingNumber(item.tracking)}</span></div>
                         <div className="text-[10px] text-slate-600 dark:text-slate-400 pt-1">• <strong>วันที่บันทึก:</strong> {item.date}</div>
                       </div>
                     </div>
-                  ))
+                    ))}
+                  </>
                 ) : (
                   <div className="text-center py-8 text-slate-600 dark:text-slate-400 text-xs">ไม่มีประวัติการนำส่งไปรษณีย์ภายนอกในช่วงนี้</div>
                 )}

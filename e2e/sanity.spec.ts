@@ -3,6 +3,13 @@ import { test, expect } from '@playwright/test';
 test.describe('DCG Smart Service Complete Sanity Checks & Transaction Workflows', () => {
   
   test.beforeEach(async ({ page }) => {
+    const savedLogs = {
+      run: [] as any[],
+      sort: [] as any[],
+      ext: [] as any[],
+    };
+    const makeTimestamp = () => new Date().toISOString().replace('T', ' ').substring(0, 19);
+
     // Intercept Google Apps Script API calls to run offline/mocked
     await page.route('**/macros/s/**/exec', async (route) => {
       const request = route.request();
@@ -20,6 +27,14 @@ test.describe('DCG Smart Service Complete Sanity Checks & Transaction Workflows'
                   { UserID: 'U001', Email: 'admin@wu.ac.th', FullName: 'Admin User', Role: 'Admin' }
                 ],
                 departments: [
+                  {
+                    DeptID: 'D999',
+                    DeptName: 'Metadata Search Unit',
+                    RouteGroup: 'เธชเธฒเธข A',
+                    Building: 'Admin Tower',
+                    Floor: '2',
+                    BudgetOwner: 'Central Office'
+                  },
                   { DeptID: 'D001', DeptName: 'สำนักอำนวยการ', RouteGroup: 'สาย A' }
                 ],
                 services: [
@@ -35,7 +50,8 @@ test.describe('DCG Smart Service Complete Sanity Checks & Transaction Workflows'
               }
             })
           });
-        } else if (action === 'publicSearch') {
+        } else if (action === 'publicSearch' || action === 'selfServiceSearch') {
+          expect(postData.auth?.selfServiceSessionToken).toBe('SS-MOCKTOKEN123');
           await route.fulfill({
             contentType: 'application/json',
             body: JSON.stringify({
@@ -52,6 +68,26 @@ test.describe('DCG Smart Service Complete Sanity Checks & Transaction Workflows'
                 ],
                 sort: [],
                 ext: []
+              }
+            })
+          });
+        } else if (action === 'requestSelfServiceOTP') {
+          await route.fulfill({
+            contentType: 'application/json',
+            body: JSON.stringify({
+              status: 'success',
+              data: { message: 'ส่งรหัส OTP สำหรับ self-service แล้ว' }
+            })
+          });
+        } else if (action === 'verifySelfServiceOTP') {
+          await route.fulfill({
+            contentType: 'application/json',
+            body: JSON.stringify({
+              status: 'success',
+              data: {
+                email: 'viewer@example.com',
+                sessionToken: 'SS-MOCKTOKEN123',
+                sessionExpiresAt: '2026-06-12T16:59:59.999Z'
               }
             })
           });
@@ -75,6 +111,61 @@ test.describe('DCG Smart Service Complete Sanity Checks & Transaction Workflows'
                 userID: 'U001',
                 sessionToken: 'ST-MOCKTOKEN123'
               }
+            })
+          });
+        } else if (action === 'saveBatch') {
+          const { txId, type, items, common } = postData.payload;
+          const timestamp = makeTimestamp();
+          expect(txId).toMatch(new RegExp(`^${type.toUpperCase()}-\\d{8}-\\d{6}-[A-Z0-9]{8}$`));
+
+          if (type === 'run') {
+            for (const item of items) {
+              savedLogs.run.push({
+                TxID: txId,
+                Timestamp: timestamp,
+                DeptName: item.deptName,
+                Route: common.route,
+                Round: common.round,
+                ItemCount: item.itemCount,
+              });
+            }
+          } else if (type === 'sort') {
+            for (const item of items) {
+              savedLogs.sort.push({
+                TxID: txId,
+                Timestamp: timestamp,
+                DeptName: item.deptName,
+                NormalCount: item.normalCount,
+                RegisterCount: item.registerCount,
+                PrivateCount: item.privateCount,
+                Total: item.total,
+              });
+            }
+          } else if (type === 'ext') {
+            for (const item of items) {
+              savedLogs.ext.push({
+                TxID: txId,
+                Timestamp: timestamp,
+                RequestingDept: item.deptName,
+                ServiceType: item.serviceType,
+                TrackingNo: item.trackingNo,
+                ItemCount: item.itemCount,
+                Cost: item.cost,
+                FundSource: item.fundSource,
+              });
+            }
+          }
+
+          await route.fulfill({
+            contentType: 'application/json',
+            body: JSON.stringify({ status: 'success', data: { txId } })
+          });
+        } else if (action === 'searchLogs') {
+          await route.fulfill({
+            contentType: 'application/json',
+            body: JSON.stringify({
+              status: 'success',
+              data: savedLogs
             })
           });
         } else {
@@ -106,6 +197,13 @@ test.describe('DCG Smart Service Complete Sanity Checks & Transaction Workflows'
     // Check elements in Public Track View
     await expect(page.locator('h3')).toContainText('ตรวจสอบการใช้บริการ');
     
+    await expect(page.locator('text=ยืนยันตัวตนก่อนตรวจสอบข้อมูล')).toBeVisible();
+    await page.fill('input[placeholder="กรอกอีเมลเพื่อรับ OTP"]', 'viewer@example.com');
+    await page.click('button:has-text("ขอรหัส OTP")');
+    await page.fill('input[placeholder="กรอกรหัส 6 หลัก"]', '123456');
+    await page.click('button:has-text("ยืนยัน OTP")');
+    await expect(page.locator('text=ยืนยันตัวตนก่อนตรวจสอบข้อมูล')).toHaveCount(0);
+
     // 3. Search for a department
     await page.fill('input[placeholder="พิมพ์ชื่อหน่วยงานของท่าน..."]', 'สำนักอำนวยการ');
     await page.click('role=option >> text=สำนักอำนวยการ');
@@ -162,6 +260,12 @@ test.describe('DCG Smart Service Complete Sanity Checks & Transaction Workflows'
     await expect(page.locator('#tab-run')).toBeVisible();
     await expect(page.locator('#tab-sort')).toBeVisible();
     await expect(page.locator('#tab-ext')).toBeVisible();
+
+    await page.click('#tab-sort');
+    await page.fill('#sort-dept-search', 'Admin Tower');
+    await expect(page.locator('role=option >> text=Metadata Search Unit')).toBeVisible();
+    await page.fill('#sort-dept-search', '2');
+    await expect(page.locator('role=option >> text=Metadata Search Unit')).toBeVisible();
   });
 
   test('should simulate transaction submissions on all 3 operational tabs and verify in ReportPage', async ({ page }) => {
@@ -226,5 +330,21 @@ test.describe('DCG Smart Service Complete Sanity Checks & Transaction Workflows'
     await page.click('button:has-text("คัดแยก-นำจ่าย")');
     await page.click('button:has-text("นำส่งภายนอก")');
     await page.click('button:has-text("รายการข้อมูล")');
+
+    // 6. [TAB: BudgetReport] - Check budget analysis dashboard
+    await page.click('button:has-text("สรุปงบประมาณ")');
+    await expect(page.locator('text=ผลประโยชน์ทางการขนส่งสุทธิ')).toBeVisible();
+    await expect(page.locator('text=มูลค่าประหยัดสะสม')).toBeVisible();
+    await expect(page.locator('text=สัดส่วนค่าบริการภายนอกแยกตามแหล่งงบประมาณ')).toBeVisible();
+
+    // Search in budget table
+    await page.fill('input[placeholder="ค้นหาชื่อหน่วยงาน..."]', 'สำนักอำนวยการ');
+    await expect(page.locator('td:has-text("สำนักอำนวยการ")').first()).toBeVisible();
+
+    // 7. Verify Excel Export trigger
+    const downloadPromise = page.waitForEvent('download');
+    await page.click('button:has-text("ส่งออก Excel")');
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toContain('.xlsx');
   });
 });
