@@ -250,3 +250,15 @@
   * ออกแบบ audit/reporting ระยะยาวสำหรับการใช้งาน self-service ของหน่วยงาน
 
 * **หมายเหตุด้านเอกสาร:** รอบนี้ใช้ `obsidian-markdown` เพื่อให้เอกสาร Markdown มีโครงสร้างอ่านต่อได้ และใช้ `handoff` เพื่อสร้างเอกสารส่งต่องานไว้ใน temp directory แยกจาก workspace ตามข้อกำหนดของ skill
+
+---
+
+### Phase 13: อัปโหลดการตั้งค่า Apps Script Web App และอัปเดตโค้ดขึ้น GitHub — 11 มิถุนายน 2569
+
+* **ช่วงเวลา:** 11 มิถุนายน 2569
+* **การดำเนินการแก้ไข:**
+  * **[appsscript.json](./appsscript.json):** เพิ่มการตั้งค่า `webapp` (สิทธิ์การเข้าถึงแบบ `ANYONE` และรันด้วยสิทธิ์ `USER_DEPLOYING`) เพื่อระบุค่าการเข้าถึงสคริปต์ปลายทาง
+  * **[src/config.ts](./src/config.ts):** อัปเดต `API_URL` เป็น URL ใหม่ของ Apps Script Web App ในการใช้งานจริง
+  * **[Build & Verification]:** ทำการทดสอบ Unit Tests (`npm run test`) สำเร็จทั้งหมด 64 เคส (`64/64 tests passed`) และ TypeScript Type Check ผ่านสำเร็จ
+  * **[Git Upload]:** บันทึกการเปลี่ยนแปลง (Commit) และอัปโหลด (Push) ขึ้น GitHub Repository (`digitalpostwu-Thanaphipat/dcg-smart-service-2026`) สาขา `main`
+
