@@ -1,10 +1,44 @@
 // --- DCG Smart Track Backend (Production Grade) ---
 
-var BACKEND_VERSION = "2026-06-11-v30-health";
+var BACKEND_VERSION = "2026-06-11-v31-schema-audit";
 
 // [GGSheet Protocol] - ฐานข้อมูลหลัก (สามารถสลับไปดึงจาก Script Properties หรือใช้ ID สำรองเริ่มต้นนี้)
 var SPREADSHEET_ID =
   PropertiesService.getScriptProperties().getProperty("SPREADSHEET_ID") || "";
+
+var CRITICAL_SCHEMA_HEADERS = {
+  Master_Users: ["UserID", "Email", "FullName", "Role", "Department", "IsActive"],
+  Master_Departments: ["DeptID", "DeptName", "RouteGroup", "Building", "Floor", "BudgetOwner"],
+  Master_Services: ["ServiceID", "ServiceName", "DefaultCost"],
+  Tx_InternalRun: ["TxID", "Timestamp", "DeptName", "Route", "Round", "ItemCount", "Note", "StaffEmail"],
+  Tx_InternalSort: ["TxID", "Timestamp", "DeptName", "NormalCount", "RegisterCount", "PrivateCount", "Total", "Note", "StaffEmail"],
+  Tx_ExternalPost: ["TxID", "Timestamp", "RequestingDept", "ServiceType", "Cost", "ItemCount", "TrackingNo", "FundSource", "StaffEmail"],
+  Tx_SelfServiceOTPStore: ["Email", "OTPCode", "OTPExpiresAt", "SessionToken", "SessionExpiresAt", "FailedAttempts", "LastRequestedAt"],
+  Tx_SelfServiceLog: [
+    "Timestamp",
+    "Email",
+    "Action",
+    "QueryText",
+    "QueryMode",
+    "SelectedDeptName",
+    "BudgetOwnerEffective",
+    "MatchedDeptCount",
+    "DateMode",
+    "StartDate",
+    "EndDate",
+    "FiscalYear",
+    "ResultCountRun",
+    "ResultCountSort",
+    "ResultCountExt",
+    "ExportFormat",
+    "TrackingMode",
+    "Status",
+    "UserAgent",
+    "ErrorCode",
+    "ErrorMessage",
+  ],
+  Feedback_Reports: ["Timestamp", "StaffEmail", "Type", "Severity", "Description", "UserAgent", "Status"],
+};
 
 /**
  * ดักจับคำขอแบบ HTTP GET สำหรับเว็บบัญชีผู้ใช้งานภายนอก (ถ้ามี)
@@ -33,6 +67,7 @@ function doPost(e) {
       action === "saveBatch" ||
       action === "deleteLog" ||
       action === "feedback" ||
+      action === "getSchemaAudit" ||
       action === "getMetaData" ||
       action === "searchLogs"
     ) {
@@ -41,6 +76,8 @@ function doPost(e) {
 
     if (action === "getHealth") {
       result = getHealth();
+    } else if (action === "getSchemaAudit") {
+      result = getSchemaAudit();
     } else if (action === "getMetaData") {
       result = getMetaData();
     } else if (action === "getPublicMetaData") {
@@ -94,18 +131,27 @@ function doPost(e) {
  * ตรวจสอบและแก้ไขโครงสร้างหัวตาราง Master_Users ในสเปรดชีตอัตโนมัติหากมีคอลัมน์คลาดเคลื่อนหรือว่างเปล่า
  * @param {Spreadsheet} ss - ออบเจกต์สเปรดชีตหลัก
  */
+function getSchemaRepairApproved() {
+  return (
+    PropertiesService.getScriptProperties().getProperty("SCHEMA_REPAIR_APPROVED") ===
+    "true"
+  );
+}
+
 function ensureMasterUsersHeadersSync(ss) {
   var userSheet = ss.getSheetByName("Master_Users");
-  if (!userSheet) return;
+  if (!userSheet) return { status: "missing_sheet", repairs: [] };
 
   var lastRow = userSheet.getLastRow();
   var lastCol = userSheet.getLastColumn();
-  if (lastRow === 0 || lastCol === 0) return;
+  if (lastRow === 0 || lastCol === 0) return { status: "empty_sheet", repairs: [] };
 
   var headers = userSheet
     .getRange(1, 1, 1, Math.min(lastCol, 10))
     .getValues()[0];
   var changed = false;
+  var repairApproved = getSchemaRepairApproved();
+  var repairs = [];
 
   // 1. ถ้าหัวคอลัมน์ B ว่างเปล่า และแถวที่ 2 เป็นอีเมล ให้ตั้งค่าเป็น "Email"
   if (
@@ -114,9 +160,12 @@ function ensureMasterUsersHeadersSync(ss) {
   ) {
     var b2Val = String(userSheet.getRange(2, 2).getValue()).trim();
     if (b2Val.indexOf("@") > -1) {
-      userSheet.getRange(1, 2).setValue("Email");
-      headers[1] = "Email";
-      changed = true;
+      repairs.push("set Master_Users!B1 to Email");
+      if (repairApproved) {
+        userSheet.getRange(1, 2).setValue("Email");
+        headers[1] = "Email";
+        changed = true;
+      }
     }
   }
 
@@ -134,14 +183,30 @@ function ensureMasterUsersHeadersSync(ss) {
     });
 
     if (isColCEmpty) {
-      userSheet.deleteColumn(3);
-      changed = true;
+      repairs.push("delete empty Master_Users column C before FullName");
+      if (repairApproved) {
+        userSheet.deleteColumn(3);
+        changed = true;
+      }
     }
   }
 
   if (changed) {
     SpreadsheetApp.flush();
   }
+
+  if (repairs.length > 0 && !repairApproved) {
+    console.warn(
+      "Schema repair blocked: set SCHEMA_REPAIR_APPROVED=true to allow repairs. " +
+        repairs.join("; "),
+    );
+  }
+
+  return {
+    status: repairs.length === 0 ? "ok" : repairApproved ? "repaired" : "repair_required",
+    repairApproved: repairApproved,
+    repairs: repairs,
+  };
 }
 
 // ตรวจสอบ Session Token และสิทธิ์การใช้งานช่วงวันทำการ (จันทร์-ศุกร์)
@@ -751,6 +816,79 @@ function getPublicMetaData() {
     departments: metadata.departments,
     services: metadata.services,
     config: metadata.config,
+  };
+}
+
+function auditSheetSchema(ss, sheetName, expectedHeaders) {
+  var sheet = ss.getSheetByName(sheetName);
+  if (!sheet) {
+    return {
+      sheetName: sheetName,
+      status: "missing_sheet",
+      headerCount: 0,
+      expectedCount: expectedHeaders.length,
+      missingHeaders: expectedHeaders,
+      extraHeaders: [],
+      orderMismatches: [],
+    };
+  }
+
+  var lastCol = sheet.getLastColumn();
+  var headers =
+    lastCol > 0
+      ? sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(function (h) {
+          return String(h || "").trim();
+        })
+      : [];
+  var missingHeaders = expectedHeaders.filter(function (header) {
+    return headers.indexOf(header) === -1;
+  });
+  var extraHeaders = headers.filter(function (header) {
+    return header && expectedHeaders.indexOf(header) === -1;
+  });
+  var orderMismatches = [];
+
+  expectedHeaders.forEach(function (header, index) {
+    if (headers[index] !== header) {
+      orderMismatches.push({
+        column: index + 1,
+        expected: header,
+        actual: headers[index] || "",
+      });
+    }
+  });
+
+  return {
+    sheetName: sheetName,
+    status:
+      missingHeaders.length === 0 && orderMismatches.length === 0
+        ? "ok"
+        : "schema_mismatch",
+    headerCount: headers.length,
+    expectedCount: expectedHeaders.length,
+    missingHeaders: missingHeaders,
+    extraHeaders: extraHeaders,
+    orderMismatches: orderMismatches,
+  };
+}
+
+function getSchemaAudit() {
+  var ss = getSpreadsheet();
+  var sheetNames = Object.keys(CRITICAL_SCHEMA_HEADERS);
+  var sheets = sheetNames.map(function (sheetName) {
+    return auditSheetSchema(ss, sheetName, CRITICAL_SCHEMA_HEADERS[sheetName]);
+  });
+  var failed = sheets.filter(function (sheet) {
+    return sheet.status !== "ok";
+  });
+
+  return {
+    mode: "read_only",
+    repairApproved: getSchemaRepairApproved(),
+    checkedAt: new Date(),
+    checkedSheets: sheets.length,
+    status: failed.length === 0 ? "ok" : "attention_required",
+    sheets: sheets,
   };
 }
 

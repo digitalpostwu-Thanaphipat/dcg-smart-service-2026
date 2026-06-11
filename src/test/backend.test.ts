@@ -46,7 +46,7 @@ function createMockedBackend(mocks: Record<string, any>) {
     // Evaluate backend.gs
     ${backendGsContent}
     
-    return { handleFeedback, runAutoBackup, setupDailyBackupTrigger, applyBackupRetention };
+    return { handleFeedback, runAutoBackup, setupDailyBackupTrigger, applyBackupRetention, getSchemaAudit, ensureMasterUsersHeadersSync };
   `;
   
   try {
@@ -86,6 +86,87 @@ describe('backend.gs - sanitizeInput (CSV / Formula Injection prevention)', () =
     expect(sanitizeInput(123)).toBe(123);
     expect(sanitizeInput(true)).toBe(true);
     expect(sanitizeInput(null)).toBe(null);
+  });
+});
+
+describe('backend.gs - schema guard read-only audit', () => {
+  it('blocks Master_Users self-healing writes unless schema repair is explicitly approved', () => {
+    const setValue = vi.fn();
+    const deleteColumn = vi.fn();
+    const userSheet = {
+      getLastRow: vi.fn(() => 3),
+      getLastColumn: vi.fn(() => 4),
+      getRange: vi.fn((row: number, col: number, numRows?: number, numCols?: number) => {
+        if (row === 1 && col === 1 && numRows === 1) {
+          return { getValues: () => [['UserID', '', '', 'FullName']] };
+        }
+        if (row === 2 && col === 2) {
+          return { getValue: () => 'staff@example.com' };
+        }
+        if (row === 2 && col === 3) {
+          return { getValues: () => [[''], ['']] };
+        }
+        return { getValues: () => [[]], getValue: () => '', setValue };
+      }),
+      deleteColumn,
+    };
+    const spreadsheet = {
+      getSheetByName: vi.fn((name) => (name === 'Master_Users' ? userSheet : null)),
+    };
+    const backend = createMockedBackend({
+      SpreadsheetApp: { flush: vi.fn(), openById: vi.fn(() => spreadsheet), getActiveSpreadsheet: vi.fn(() => spreadsheet) },
+      PropertiesService: {
+        getScriptProperties: vi.fn(() => ({
+          getProperty: vi.fn((key) => (key === 'SCHEMA_REPAIR_APPROVED' ? 'false' : 'mock-spreadsheet')),
+        })),
+      },
+      console: { warn: vi.fn(), log: vi.fn(), error: vi.fn() },
+    });
+
+    const result = backend.ensureMasterUsersHeadersSync(spreadsheet);
+
+    expect(result.status).toBe('repair_required');
+    expect(result.repairs).toEqual([
+      'set Master_Users!B1 to Email',
+      'delete empty Master_Users column C before FullName',
+    ]);
+    expect(setValue).not.toHaveBeenCalled();
+    expect(deleteColumn).not.toHaveBeenCalled();
+  });
+
+  it('returns a read-only schema audit report without creating or editing sheets', () => {
+    const insertSheet = vi.fn();
+    const selfServiceLogHeaders = [
+      'Timestamp', 'Email', 'Action', 'QueryText', 'QueryMode', 'SelectedDeptName',
+      'BudgetOwnerEffective', 'MatchedDeptCount', 'DateMode', 'StartDate', 'EndDate',
+      'FiscalYear', 'ResultCountRun', 'ResultCountSort', 'ResultCountExt', 'ExportFormat',
+      'TrackingMode', 'Status', 'UserAgent', 'ErrorCode', 'ErrorMessage',
+    ];
+    const selfServiceLogSheet = {
+      getLastColumn: vi.fn(() => selfServiceLogHeaders.length),
+      getRange: vi.fn(() => ({ getValues: () => [selfServiceLogHeaders] })),
+    };
+    const spreadsheet = {
+      getSheetByName: vi.fn((name) => (name === 'Tx_SelfServiceLog' ? selfServiceLogSheet : null)),
+      insertSheet,
+    };
+    const backend = createMockedBackend({
+      SpreadsheetApp: { flush: vi.fn(), openById: vi.fn(() => spreadsheet), getActiveSpreadsheet: vi.fn(() => spreadsheet) },
+      PropertiesService: {
+        getScriptProperties: vi.fn(() => ({
+          getProperty: vi.fn((key) => (key === 'SCHEMA_REPAIR_APPROVED' ? 'false' : 'mock-spreadsheet')),
+        })),
+      },
+      console: { warn: vi.fn(), log: vi.fn(), error: vi.fn() },
+    });
+
+    const result = backend.getSchemaAudit();
+    const logSheet = result.sheets.find((sheet: any) => sheet.sheetName === 'Tx_SelfServiceLog');
+
+    expect(result.mode).toBe('read_only');
+    expect(logSheet.status).toBe('ok');
+    expect(logSheet.headerCount).toBe(21);
+    expect(insertSheet).not.toHaveBeenCalled();
   });
 });
 

@@ -43,6 +43,15 @@ export const api = {
         return await handleJsonResponse(res);
     },
 
+    getSchemaAudit: async () => {
+        const res = await fetch(API_URL, {
+            method: 'POST',
+            headers: JSON_HEADERS,
+            body: JSON.stringify({ action: 'getSchemaAudit', auth: getAuthPayload() })
+        });
+        return await handleJsonResponse(res);
+    },
+
     fetchMetaData: async (tokenOverride?: string) => {
         const authPayload = tokenOverride ? { sessionToken: tokenOverride } : getAuthPayload();
         const res = await fetch(API_URL, { 

@@ -231,12 +231,17 @@
   * `npm.cmd run test:e2e` รายงาน test ผ่าน 3/3 แต่ process timeout หลังจบ test จาก lifecycle dev server บน Windows จึงต้องอ่านผลเป็น "flow ผ่าน แต่คำสั่งไม่ปิดเอง"
 
 * **สถานะ Phase 6-7 หลังอนุมัติปิดงาน:**
-  * Phase 6: Monitoring/log สำหรับ self-service เสร็จในโค้ดแล้ว โดยใช้ `Tx_SelfServiceLog`, query mode, matched departments, result counts, OTP/search/error/export events และ best-effort browser error logging
+  * Phase 6: Monitoring/log สำหรับ self-service เสร็จสมบูรณ์ โดยใช้ `Tx_SelfServiceLog`, query mode, matched departments, result counts, OTP/search/error/export events และ best-effort browser error logging; production sheet ตรวจแล้วมี header ครบ 21 คอลัมน์
   * Phase 7: Export/print view สำหรับรายงานหน่วยงานเสร็จในโค้ดแล้ว โดยมี Excel export, print-only report window, ไม่เปิดเผย `StaffEmail`, masking tracking number, export/print event logging และจำกัด Excel export ต่อ session
 
+* **สถานะ Phase 8 Schema guard/read-only audit:**
+  * เพิ่ม `getSchemaAudit` แบบ read-only สำหรับตรวจ critical sheets และ headers โดยไม่สร้าง/แก้/ลบชีท
+  * เปลี่ยน self-healing ของ `Master_Users` ให้ block การเขียนจริงเป็นค่าเริ่มต้น ต้องตั้ง Script Property `SCHEMA_REPAIR_APPROVED=true` ก่อนจึงจะอนุญาตให้ซ่อม schema
+  * เพิ่ม unit tests ยืนยันว่า schema audit ไม่เรียก `insertSheet` และ schema repair ไม่เรียก `setValue`/`deleteColumn` เมื่อยังไม่ได้อนุมัติ
+  * สร้าง Apps Script version 31 แล้ว แต่การ redeploy ผ่าน `clasp` ทำให้ URL จากเครื่องทดสอบตอบ 404 จึง rollback deployment เดิมกลับ @30 และต้องยืนยัน/อัปเดต Web app deployment ผ่าน Apps Script UI ก่อนเปิดใช้ v31 ใน production
+
 * **งานถัดไปที่ยังเหลือ:**
-  * Phase 6: ยืนยัน production sheet จริงว่า `Tx_SelfServiceLog` มี header ครบและรับ event จริงครบทุก action
-  * Phase 8: Schema guard/read-only audit สำหรับชีทสำคัญ โดยห้ามแก้ production sheet อัตโนมัติถ้ายังไม่ได้รับอนุมัติชัดเจน
+  * Phase 8: กด Deploy > Manage deployments ใน Apps Script UI ให้ Web app ใช้ version 31 แล้วรัน `getSchemaAudit` ใน production เพื่อเก็บผลตรวจจริง
 
 * **ประเด็นที่เลื่อนไปปีงบประมาณถัดไป:**
   * สร้าง model ตัวแทนหน่วยงานหรือ viewer role อย่างเป็นทางการ
