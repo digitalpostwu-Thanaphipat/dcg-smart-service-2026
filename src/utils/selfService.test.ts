@@ -3,6 +3,7 @@ import {
   buildSelfServiceExportFileName,
   buildSelfServiceExportSheets,
   buildSelfServiceErrorLogPayload,
+  buildSelfServicePrintHtml,
   maskTrackingNumber,
   resolveSelfServiceSelection,
   summarizePublicExtByFund,
@@ -138,5 +139,29 @@ describe('self-service utilities', () => {
   it('builds a filesystem-safe self-service export filename', () => {
     expect(buildSelfServiceExportFileName('ส่วน/อำนวยการ', '2026-06-01', '2026-06-11'))
       .toBe('DCG-Self-Service_ส่วน-อำนวยการ_2026-06-01_2026-06-11.xlsx');
+  });
+});
+
+describe('self-service print report', () => {
+  it('builds a print report with masked tracking and no staff email leakage', () => {
+    const html = buildSelfServicePrintHtml({
+      email: 'viewer@example.com',
+      deptName: 'public department',
+      queryMode: 'department',
+      budgetOwner: 'public department',
+      matchedDeptCount: 1,
+      startDate: '2026-06-01',
+      endDate: '2026-06-11',
+      fiscalYear: '2569',
+      exportedAt: '2026-06-11 11:00',
+      runData: [{ date: '02/06/2026', route: 'A', round: 'AM', count: 1, note: 'ok', StaffEmail: 'staff@example.com' }],
+      sortData: [],
+      extData: [{ date: '04/06/2026', service: 'EMS', count: 1, cost: 37, fund: 'central', tracking: 'RL123456789TH', StaffEmail: 'staff@example.com' }],
+    });
+
+    expect(html).toContain('RL123***89TH');
+    expect(html).not.toContain('RL123456789TH');
+    expect(html).not.toContain('staff@example.com');
+    expect(html).toContain('StaffEmail is excluded');
   });
 });

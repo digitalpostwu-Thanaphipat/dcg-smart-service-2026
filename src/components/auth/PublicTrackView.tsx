@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
 import { useAppStore } from '../../store/useAppStore';
 import { api } from '../../services/api';
-import { Search, MapPin, Inbox, Globe, ArrowLeft, Link, Mail, ShieldCheck, AlertCircle, Download } from 'lucide-react';
+import { Search, MapPin, Inbox, Globe, ArrowLeft, Link, Mail, ShieldCheck, AlertCircle, Download, Printer } from 'lucide-react';
 import { toast } from 'sonner';
 import SmartSearchInput from '../common/SmartSearchInput';
 import {
@@ -10,6 +10,7 @@ import {
   buildSelfServiceErrorLogPayload,
   buildSelfServiceExportFileName,
   buildSelfServiceExportSheets,
+  buildSelfServicePrintHtml,
   maskTrackingNumber,
   resolveSelfServiceSelection,
   summarizeUserAgent,
@@ -419,6 +420,76 @@ export const PublicTrackView: React.FC<PublicTrackViewProps> = ({ onBack, initia
     }
   };
 
+  const handlePrintReport = async () => {
+    if (!hasSearched || !selectedContext) {
+      toast.warning('เธเธฃเธธเธ“เธฒเธเนเธเธซเธฒเธเนเธญเธกเธนเธฅเธเนเธญเธ print');
+      return;
+    }
+
+    const payloadBase = {
+      email: selfServiceEmail,
+      queryText: selectedContext.deptName,
+      queryMode: selectedContext.queryMode,
+      selectedDeptName: selectedContext.deptName,
+      budgetOwnerEffective: selectedContext.budgetOwner,
+      matchedDeptCount: selectedContext.matchedDepartments.length,
+      dateMode: currentDateMode,
+      startDate: publicStartDate,
+      endDate: publicEndDate,
+      fiscalYear: fiscalYearLabel,
+      resultCountRun: filteredRunData.length,
+      resultCountSort: filteredSortData.length,
+      resultCountExt: filteredExtData.length,
+      exportFormat: 'print',
+      trackingMode: 'masked',
+      userAgent: summarizeUserAgent(navigator.userAgent),
+    };
+
+    try {
+      const printWindow = window.open('', '_blank', 'width=1024,height=768');
+      if (!printWindow) {
+        throw new Error('POPUP_BLOCKED');
+      }
+      printWindow.opener = null;
+
+      printWindow.document.open();
+      printWindow.document.write(buildSelfServicePrintHtml({
+        email: selfServiceEmail,
+        deptName: selectedContext.deptName,
+        queryMode: selectedContext.queryMode,
+        budgetOwner: selectedContext.budgetOwner,
+        matchedDeptCount: selectedContext.matchedDepartments.length,
+        startDate: publicStartDate,
+        endDate: publicEndDate,
+        fiscalYear: fiscalYearLabel,
+        exportedAt: new Date().toLocaleString('th-TH'),
+        runData: filteredRunData,
+        sortData: filteredSortData,
+        extData: filteredExtData,
+      }));
+      printWindow.document.close();
+
+      api.logSelfServiceEvent({
+        ...payloadBase,
+        action: 'self_service_export',
+        status: 'success',
+        errorCode: '',
+        errorMessage: '',
+      }, selfServiceToken);
+    } catch (err: any) {
+      api.logSelfServiceEvent({
+        ...payloadBase,
+        action: 'self_service_export',
+        status: 'error',
+        errorCode: 'PRINT_FAILED',
+        errorMessage: String(err.message || err),
+      }, selfServiceToken);
+      toast.error('print report เนเธกเนเธชเธณเน€เธฃเนเธ', {
+        description: String(err.message || err),
+      });
+    }
+  };
+
   const handlePublicSearch = () => {
     if (!publicSearchDept) { toast.warning('กรุณาเลือกหน่วยงานของท่าน'); return; }
     performSearch(publicSearchDept);
@@ -586,6 +657,14 @@ export const PublicTrackView: React.FC<PublicTrackViewProps> = ({ onBack, initia
             >
               <Download size={12} />
               Export Excel ({exportCount}/10)
+            </button>
+            <button
+              onClick={handlePrintReport}
+              disabled={!selectedContext}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 dark:bg-slate-800/40 dark:hover:bg-slate-700/60 text-slate-700 dark:text-slate-200 rounded-xl text-[10px] font-bold border border-slate-200 dark:border-white/5 transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-purple-500 dark:focus-visible:ring-orange-500 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Printer size={12} />
+              Print Report
             </button>
             <button
               onClick={handleCopyLink}

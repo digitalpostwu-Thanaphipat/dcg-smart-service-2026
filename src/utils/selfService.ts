@@ -215,3 +215,61 @@ export const buildSelfServiceExportSheets = (input: SelfServiceExportInput) => (
     ]),
   ],
 });
+
+const escapeHtml = (value: unknown) => String(value ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
+const renderPrintRows = (rows: Array<Array<unknown>>) => rows.map((row) => (
+  `<tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`
+)).join('');
+
+const renderPrintTable = (title: string, rows: Array<Array<unknown>>) => {
+  const [headers, ...bodyRows] = rows;
+  return `
+    <section>
+      <h2>${escapeHtml(title)}</h2>
+      <table>
+        <thead><tr>${headers.map((cell) => `<th>${escapeHtml(cell)}</th>`).join('')}</tr></thead>
+        <tbody>${bodyRows.length ? renderPrintRows(bodyRows) : '<tr><td colspan="8">No records</td></tr>'}</tbody>
+      </table>
+    </section>
+  `;
+};
+
+export const buildSelfServicePrintHtml = (input: SelfServiceExportInput) => {
+  const sheets = buildSelfServiceExportSheets(input);
+  return `<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <title>${escapeHtml(buildSelfServiceExportFileName(input.deptName, input.startDate, input.endDate).replace(/\.xlsx$/, ''))}</title>
+  <style>
+    @page { margin: 14mm; }
+    body { color: #111827; font-family: Arial, sans-serif; font-size: 12px; line-height: 1.45; }
+    h1 { font-size: 20px; margin: 0 0 4px; }
+    h2 { font-size: 15px; margin: 20px 0 8px; }
+    .meta { color: #475569; margin-bottom: 16px; }
+    table { border-collapse: collapse; width: 100%; page-break-inside: auto; }
+    th, td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; vertical-align: top; }
+    th { background: #f1f5f9; font-weight: 700; }
+    tr { page-break-inside: avoid; page-break-after: auto; }
+    .notice { margin-top: 12px; color: #475569; font-size: 11px; }
+    @media print { button { display: none; } }
+  </style>
+</head>
+<body>
+  <h1>DCG Smart Service Self-Service Report</h1>
+  <div class="meta">${escapeHtml(input.deptName)} | ${escapeHtml(input.startDate)} - ${escapeHtml(input.endDate)} | ${escapeHtml(input.fiscalYear)}</div>
+  ${renderPrintTable('Summary', sheets.summary)}
+  ${renderPrintTable('Internal Pickup/Delivery', sheets.run)}
+  ${renderPrintTable('Postal Sorting', sheets.sort)}
+  ${renderPrintTable('External Post', sheets.ext)}
+  <p class="notice">Tracking numbers are masked. StaffEmail is excluded from this public report.</p>
+  <script>window.addEventListener('load', function () { window.print(); });</script>
+</body>
+</html>`;
+};

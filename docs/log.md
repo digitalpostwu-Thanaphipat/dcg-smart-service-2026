@@ -230,9 +230,12 @@
   * Apps Script syntax check ผ่านด้วยการโหลด `backend.gs` ผ่าน `new Function(...)`
   * `npm.cmd run test:e2e` รายงาน test ผ่าน 3/3 แต่ process timeout หลังจบ test จาก lifecycle dev server บน Windows จึงต้องอ่านผลเป็น "flow ผ่าน แต่คำสั่งไม่ปิดเอง"
 
+* **สถานะ Phase 6-7 หลังอนุมัติปิดงาน:**
+  * Phase 6: Monitoring/log สำหรับ self-service เสร็จในโค้ดแล้ว โดยใช้ `Tx_SelfServiceLog`, query mode, matched departments, result counts, OTP/search/error/export events และ best-effort browser error logging
+  * Phase 7: Export/print view สำหรับรายงานหน่วยงานเสร็จในโค้ดแล้ว โดยมี Excel export, print-only report window, ไม่เปิดเผย `StaffEmail`, masking tracking number, export/print event logging และจำกัด Excel export ต่อ session
+
 * **งานถัดไปที่ยังเหลือ:**
-  * Phase 6: Monitoring/log สำหรับ self-service เช่น `Tx_SelfServiceLog`, query mode, matched departments, result counts, และ error events
-  * Phase 7: Export/print view สำหรับรายงานหน่วยงาน โดยคุมไม่ให้เปิดเผย `StaffEmail` และ masking tracking number ตาม policy
+  * Phase 6: ยืนยัน production sheet จริงว่า `Tx_SelfServiceLog` มี header ครบและรับ event จริงครบทุก action
   * Phase 8: Schema guard/read-only audit สำหรับชีทสำคัญ โดยห้ามแก้ production sheet อัตโนมัติถ้ายังไม่ได้รับอนุมัติชัดเจน
 
 * **ประเด็นที่เลื่อนไปปีงบประมาณถัดไป:**
