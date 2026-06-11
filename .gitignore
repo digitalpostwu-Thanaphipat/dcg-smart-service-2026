@@ -34,7 +34,8 @@ npm-debug.log*
 .env.*.local
 
 # Scratch / temporary files
-scratch/primary_sheet_dump.json
+scratch/
+scripts/
 
 # Notes (personal — not project docs)
 notes/
@@ -44,4 +45,3 @@ ORIGINAL_REQUEST.md
 
 # Unused copy of @ alias folder
 @/
-

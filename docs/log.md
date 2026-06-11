@@ -42,7 +42,7 @@
   * จัดทำเอกสารข้อมูลกลาง (Persistent Wiki) จำนวน 5 ฉบับลงในโฟลเดอร์ `./docs`
   * วางการเชื่อมโยงระบบเอกสารด้วย Markdown links และตรวจสอบความถูกต้องของข้อมูล
 * **เอกสารที่สร้างเสร็จสมบูรณ์:**
-  * [index.md](./index.md) (สารบัญวิกิและการอ้างอิงหมวดหมู่)
+  * [log.md](./log.md) (บันทึกหลักและการอ้างอิงหมวดหมู่)
   * [log.md](./log.md) (ประวัติและกิจกรรมการตรวจสอบระบบ)
   * [architecture.md](./architecture.md) (สถาปัตยกรรมระบบ ปัญหาโครงสร้างไฟล์ และโครงสร้างสัญญา API)
   * [vulnerabilities.md](./vulnerabilities.md) (สมุดรายงานความปลอดภัยและการแก้ไขปัญหาข้อมูลรั่ว/สูตรคำนวณ)
@@ -130,9 +130,9 @@
     * ผ่าน WCAG 2.1 AA (≥4.5:1 contrast ratio)
   * **[Documentation Updates — ✅ เสร็จสมบูรณ์]:**
     * อัปเดต `architecture_analysis_report.md` เป็น v2.1 — ปรับสถานะ Q0+Backup เป็นเสร็จสมบูรณ์, เพิ่มข้อมูล backend ใหม่
-    * อัปเดต `migration_plan_v2.md` — เพิ่ม Section 6: แผนงานพรุ่งนี้ (ศุกร์ 5 มิ.ย. 2569)
+    * อัปเดต `docs/log.md` — เพิ่ม Section 6: แผนงานพรุ่งนี้ (ศุกร์ 5 มิ.ย. 2569)
     * อัปเดต `log.md` (ไฟล์นี้) — เพิ่มเฟสที่ 7
-    * อัปเดต `index.md` — ปรับลิงก์และสถานะ
+    * อัปเดต `docs/log.md` — ปรับลิงก์และสถานะ
 
 ---
 
@@ -164,7 +164,7 @@
       * สเปรดชีต V2 (ใหม่): `1AL0AHGleUZ1UmS2N3QAg3vM0z_E1ymJ8Eg9FfUneAD0` (ตัวที่จะนำมาใช้ทำงานแทนตัวเดิมตัวจริง)
     * **รันสคริปต์โอนย้ายข้อมูล:**
       * การรันครั้งแรก (12:43:44 น.): ระบบแจ้งเตือนข้ามการทำงานเนื่องจากสคริปต์พยายามหาชื่อแผ่นงานแบบเก่า (`Tx_Submissions`, `Tx_Delegations`, `Tx_Feedback`)
-      * การแก้ไข: ทำการปรับแก้สคริปต์ใน [scratch/migration_script.gs](file:///D:/[DEV] __WUS_Track_DB/scratch/migration_script.gs) ให้เป็นชื่อแผ่นงานจริง ได้แก่ `Tx_InternalRun`, `Tx_InternalSort`, และ `Tx_ExternalPost`
+      * การแก้ไข: ทำการปรับแก้สคริปต์ใน Apps Script migration helper (removed from repository cleanup) ให้เป็นชื่อแผ่นงานจริง ได้แก่ `Tx_InternalRun`, `Tx_InternalSort`, และ `Tx_ExternalPost`
       * การรันครั้งที่สอง (12:47:39 น.): ทำการคัดลอกสคริปต์ที่แก้ไขแล้วไปรันบน Apps Script ของสเปรดชีตใหม่สำเร็จ 100% โดยย้ายข้อมูลได้ดังนี้:
         * **Tx_InternalRun**: 4,802 รายการ
         * **Tx_InternalSort**: 1,691 รายการ
@@ -183,7 +183,7 @@
 ### 📌 เฟสที่ 9: การตรวจสอบโค้ดและปรับปรุงเอกสารวิกิให้สอดคล้องกัน (Code Audit & Documentation Sync)
 * **ช่วงเวลา:** 8 มิถุนายน 2569
 * **การดำเนินการแก้ไข:**
-  * **[Documentation Update]:** ปรับปรุงรายงาน `evaluation_report.md` ในส่วนของตารางคะแนน (Score Card) ให้สะท้อนค่าจริงของการแก้ไข และย้ายประเด็นจากหมวดข้อบกพร่อง (Weaknesses) ไปเป็นสถานะแก้ไขเสร็จสิ้นสมบูรณ์ (Resolved)
+  * **[Documentation Update]:** ปรับปรุงรายงาน `docs/log.md` ในส่วนของตารางคะแนน (Score Card) ให้สะท้อนค่าจริงของการแก้ไข และย้ายประเด็นจากหมวดข้อบกพร่อง (Weaknesses) ไปเป็นสถานะแก้ไขเสร็จสิ้นสมบูรณ์ (Resolved)
   * **[Security & WCAG Documentation Sync]:** ทำการอัปเดตเอกสาร `docs/vulnerabilities.md` และ `docs/wcag.md` โดยระบุสถานะและแนวทางการแก้ไขจริงที่ได้ดำเนินการลงไปในโค้ดของแต่ละหัวข้อ (SEC-01 ถึง SEC-09 และข้อกำหนดความเหลื่อมล้ำในการใช้งานทั่วไป)
   * **[Source Code Inspection & Audit]:** ตรวจสอบโค้ดจริงในโครงการเพื่อยืนยันความปลอดภัยและความถูกต้อง ได้แก่ ฟังก์ชัน OTP Expire Hoisting/OTP Reuse ใน `backend.gs`, โครงสร้างการหยุดกระจายสัญญาณ Event Bubbling บนคีย์บอร์ดใน `RunPage.tsx`, และโครงสร้าง Focus Trap/ARIA attributes ใน `ReceiptModal.tsx`
   * **[DOM Sync for Tabpanel]:** ทำการปรับแก้ไข `src/App.tsx` เพื่อห่อหุ้มคอมโพเนนต์เนื้อหาในแต่ละหน้าด้วยแท็ก `div` ที่มี `role="tabpanel"`, `id={`panel-${activeTab}`}`, และ `aria-labelledby` เพื่อแก้ไขข้อบกพร่อง `aria-controls` ไม่สอดคล้องกับโครงสร้าง DOM ของเบราว์เซอร์
@@ -206,7 +206,39 @@
   * **[OTP Flow Verification]:** พัฒนาสคริปต์ `test_otp_flow.py` และ `test_verify_otp.py` ทดสอบการจำลองเรียกขอรหัส OTP และตรวจสอบรหัสกับระบบ Live API จริง พบว่ารันผ่านได้สำเร็จ 100% และระบบบันทึกค่าลง `Tx_OTPStore` อย่างถูกต้อง (ขจัดปัญหาช่องว่างและการพิมพ์ตัวพิมพ์เล็ก-ใหญ่ผิดพลาด)
   * **[Google clasp Integration]:** กำหนดค่าไฟล์ `.clasp.json`, `.claspignore` และ `appsscript.json` เพื่อแมปโปรเจกต์ไปยัง Script ID `1eFOcvfTQ8GTwsFXnSO7jGZMwizAcASwk1tM8AKHl5CRRINl58w_Dfj_1` ของผู้ใช้งาน พร้อมทำการรันคำสั่ง `clasp push` อัปโหลดซอร์สโค้ด `backend.gs` และไฟล์ Manifest ทั้งหมดขึ้นไปยังเซิร์ฟเวอร์โครงการฝั่ง Apps Script ได้สำเร็จ 100%
 
+---
 
+### Phase 12: Self-Service Improvement Log and Handoff Sync — 10 มิถุนายน 2569
 
+* **ช่วงเวลา:** 10 มิถุนายน 2569
+* **บริบท:** ระบบ DCG Smart Service deploy ใช้งานจริงผ่าน Vercel แล้ว และกำลังปรับปรุง self-service สำหรับให้หน่วยงานภายในมหาวิทยาลัยตรวจสอบการใช้บริการของตนเอง
+* **ทักษะที่ใช้ในรอบเอกสารนี้:** `grill-me`, `obsidian-markdown`, `handoff`
+* **เอกสารอ้างอิงหลัก:** `docs/log.md` เป็น source of truth หลัง cleanup เอกสารชั่วคราว
 
+* **สรุปงานพัฒนาที่บันทึกเป็น source of truth ในเอกสารแผน:**
+  * Phase 0: Production safety quick fixes และ verification baseline
+  * Phase 1: TxID hardening โดยยืนยันให้ TxID เป็นรหัสชุดการบันทึกหนึ่งครั้ง และเพิ่มความแข็งแรงของรูปแบบเลข
+  * Phase 2: ปรับ search metadata ให้รองรับ `Building`, `Floor`, และ `BudgetOwner`
+  * Phase 3: normalize แหล่งงบประมาณของงานนำส่งไปรษณีย์ภายนอกให้รองรับ 3 แหล่งงบประมาณ
+  * Phase 4: เพิ่ม self-service OTP flow สำหรับผู้ใช้ภายนอกทีมงานภายใน โดยยังไม่ผูกกับรายชื่อตัวแทนหน่วยงานในปีงบประมาณนี้
+  * Phase 5: ปรับ self-service search/report ให้ผู้ใช้ต้องเลือกหน่วยงานหรือโหมดรวมตาม `BudgetOwner` ก่อนดูข้อมูล และแสดงข้อมูลงานบริการครบ 3 งาน
 
+* **ผลตรวจล่าสุดที่ควรใช้เป็น baseline ก่อน deploy รอบถัดไป:**
+  * `npm.cmd run test` ผ่าน 55 tests
+  * `npm.cmd run lint` ผ่านเมื่อรันเดี่ยว
+  * `npm.cmd run build` ผ่าน
+  * Apps Script syntax check ผ่านด้วยการโหลด `backend.gs` ผ่าน `new Function(...)`
+  * `npm.cmd run test:e2e` รายงาน test ผ่าน 3/3 แต่ process timeout หลังจบ test จาก lifecycle dev server บน Windows จึงต้องอ่านผลเป็น "flow ผ่าน แต่คำสั่งไม่ปิดเอง"
+
+* **งานถัดไปที่ยังเหลือ:**
+  * Phase 6: Monitoring/log สำหรับ self-service เช่น `Tx_SelfServiceLog`, query mode, matched departments, result counts, และ error events
+  * Phase 7: Export/print view สำหรับรายงานหน่วยงาน โดยคุมไม่ให้เปิดเผย `StaffEmail` และ masking tracking number ตาม policy
+  * Phase 8: Schema guard/read-only audit สำหรับชีทสำคัญ โดยห้ามแก้ production sheet อัตโนมัติถ้ายังไม่ได้รับอนุมัติชัดเจน
+
+* **ประเด็นที่เลื่อนไปปีงบประมาณถัดไป:**
+  * สร้าง model ตัวแทนหน่วยงานหรือ viewer role อย่างเป็นทางการ
+  * เพิ่มชีทหรือโครงสร้าง `Department_Viewers` เพื่อผูกอีเมลกับหน่วยงานที่ดูได้
+  * พิจารณาเลขรายการย่อยต่อแถว (`LineID` หรือ `ItemNo`) เพิ่มจาก TxID ที่เป็น batch id
+  * ออกแบบ audit/reporting ระยะยาวสำหรับการใช้งาน self-service ของหน่วยงาน
+
+* **หมายเหตุด้านเอกสาร:** รอบนี้ใช้ `obsidian-markdown` เพื่อให้เอกสาร Markdown มีโครงสร้างอ่านต่อได้ และใช้ `handoff` เพื่อสร้างเอกสารส่งต่องานไว้ใน temp directory แยกจาก workspace ตามข้อกำหนดของ skill

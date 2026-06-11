@@ -556,8 +556,8 @@ function setupBackupTrigger() {
 
 เอกสารที่เกี่ยวข้อง:
 
-* [แผน Migration v2](./migration_plan_v2.md) — ขั้นตอนย้ายระบบ Dev → Production (7 steps + Rollback)
-* [เป้าหมายโครงการ](../goal.md) — Lifecycle Phases และ Verification Checklist
+* [แผน Migration v2](./log.md) — ขั้นตอนย้ายระบบ Dev → Production (7 steps + Rollback)
+* [เป้าหมายโครงการ](./log.md) — Lifecycle Phases และ Verification Checklist
 * [รายงาน WCAG 2.2 AA](./wcag.md) — มาตรฐานการเข้าถึง
 * [รายงานช่องโหว่ความปลอดภัย](./vulnerabilities.md) — Security Audit
 * [คู่มือส่งมอบ](./handover.md) — Handover สำหรับผู้ดูแลระบบ
@@ -579,7 +579,7 @@ function setupBackupTrigger() {
 | **Q4+** | 4.4.1 Rate Limiting / 4.4.2 Cache Routing | Optimization | 1 สัปดาห์ | ⏳ |
 | **รวม** | **10 โมดูล** | — | **~6.5 สัปดาห์** | |
 
-> **Cross-Q Activities** (ทุก Q ต้องทำ): Unit test, E2E test, Update docs, Update migration_plan_v2.md, Rollback plan, User feedback session, CHANGELOG entry
+> **Cross-Q Activities** (ทุก Q ต้องทำ): Unit test, E2E test, Update docs/log.md, Rollback plan, User feedback session, CHANGELOG entry
 
 > ⚠️ **ลำดับภายใน Q** (แนะนำ):
 > * **Q1**: 4.1.3 → 4.1.1 → 4.1.2 (เพราะ 4.1.3 เป็น infra ที่ 4.1.1 ต้องใช้)

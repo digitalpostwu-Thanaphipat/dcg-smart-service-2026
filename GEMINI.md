@@ -12,15 +12,15 @@
 4. **Accessibility First (WCAG 2.2 AA)**: Mandatory use of `@access-audit`. Minimum contrast 4.5:1.
 5. **Pixel Perfect**: Use meaningful transitions (Framer Motion). Follow `@awesome-design-md`.
 6. **PWA Compliance**: Evaluate every feature for offline capability. Config `manifest.json`.
-7. **GGSheet Protocol**: Treat Google Sheets with strict schema. Use `google-sheets-automation` (Standalone OAuth) as the primary sync tool. Mandatory: All sync operations must be wrapped in a connection guard using `python scripts/auth.py status` to ensure active token validity before execution. Maintain schema tracking via `@agent-memory`.
-8. **State Handover (MANDATORY)**: A task is NEVER complete until `goal.md` is explicitly updated. You MUST write the outcome, check off completed items, and outline Next Actions in `goal.md` before stopping your work or returning control to the user.
+7. **GGSheet Protocol**: Treat Google Sheets with strict schema. Use Apps Script deployments, `clasp`, or approved Google Workspace CLI/REST checks for production verification. Never write to production sheets without explicit approval and a backup path.
+8. **State Handover (MANDATORY)**: A task is NEVER complete until the outcome, verification, and next actions are recorded in `docs/log.md` or a task-specific document under `docs/`. Keep temporary planning notes out of the repository root.
 
 ## 🚀 Team Workflow (4-Phase Lifecycle)
 
 ### Phase 1: Plan (The Strategist)
 - **Action**: `@goal-buddy` maps repository + reads `คู่มือการใช้งานระบบบริหารงานไปรษณีย์.docx`.
 - **Validation**: `@grill-me` challenges the plan. `@multi-agent-brainstorming` finds the best path.
-- **Output**: `goal.md` and `PRD.md` at root.
+- **Output**: durable implementation notes under `docs/` when needed.
 
 ### Phase 2: Design (The Architect)
 - **Action**: `@grill-with-docs` creates ADR (Architecture Decision Record).
