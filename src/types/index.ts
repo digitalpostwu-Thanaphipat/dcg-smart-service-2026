@@ -28,7 +28,10 @@ export interface LogItem {
     cost?: number;
     type: 'run' | 'sort' | 'ext';
     fund?: string;
-    syncStatus?: 'pending' | 'syncing' | 'synced';
+    syncStatus?: 'pending' | 'syncing' | 'synced' | 'auth_required' | 'failed';
+    sourceFiscalYear?: number;
+    sourceType?: 'active' | 'archive';
+    sourceSpreadsheetId?: string;
     /** เส้นทาง/สายส่ง (เฉพาะ run) */
     route?: string;
     /** รอบการส่ง เช่น รอบเช้า/รอบบ่าย (เฉพาะ run) */

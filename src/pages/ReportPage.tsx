@@ -64,6 +64,9 @@ export const ReportPage: React.FC = () => {
               count: parseInt(r.ItemCount) || 0,
               type: 'run',
               syncStatus: 'synced',
+              sourceFiscalYear: r.SourceFiscalYear,
+              sourceType: r.SourceType,
+              sourceSpreadsheetId: r.SourceSpreadsheetId,
               route: r.Route || 'ไม่ระบุสาย',
               round: r.Round || 'รอบทั่วไป',
             })
@@ -80,6 +83,9 @@ export const ReportPage: React.FC = () => {
               count: parseInt(r.Total) || 0,
               type: 'sort',
               syncStatus: 'synced',
+              sourceFiscalYear: r.SourceFiscalYear,
+              sourceType: r.SourceType,
+              sourceSpreadsheetId: r.SourceSpreadsheetId,
               normalCount: normal,
               registerCount: register,
               privateCount: priv,
@@ -96,6 +102,9 @@ export const ReportPage: React.FC = () => {
               type: 'ext',
               fund: r.FundSource,
               syncStatus: 'synced',
+              sourceFiscalYear: r.SourceFiscalYear,
+              sourceType: r.SourceType,
+              sourceSpreadsheetId: r.SourceSpreadsheetId,
             })
           );
         }
@@ -155,6 +164,7 @@ export const ReportPage: React.FC = () => {
             type,
             fund,
             syncStatus,
+            sourceType: 'active',
             route,
             round,
             normalCount,
@@ -284,9 +294,10 @@ export const ReportPage: React.FC = () => {
     }, 2000);
   };
 
-  const exportToExcel = () => {
+  const exportToExcel = async () => {
     let exportData: any[] = [];
     let filename = 'report';
+    let exportSourceLogs: LogItem[] = [];
 
     const formatDateStr = (ts: string) => ts;
 
@@ -294,11 +305,20 @@ export const ReportPage: React.FC = () => {
       if (status === 'synced') return 'ซิงค์แล้ว';
       if (status === 'pending') return 'ค้างซิงค์ (ออฟไลน์)';
       if (status === 'syncing') return 'กำลังซิงค์';
+      if (status === 'auth_required') return 'รอยืนยัน OTP ใหม่';
+      if (status === 'failed') return 'ซิงค์ไม่สำเร็จ';
       return 'ซิงค์แล้ว';
     };
 
+    const getSourceText = (sourceType?: string) => sourceType === 'archive' ? 'archive' : 'active';
+    const sourceColumns = (log?: LogItem) => ({
+      'Fiscal year': log?.sourceFiscalYear || '',
+      'Data source': getSourceText(log?.sourceType),
+    });
+
     if (reportTab === 'list') {
       filename = `DCG_Smart_Service_รายการทั้งหมด_${new Date().toISOString().split('T')[0]}`;
+      exportSourceLogs = logs;
       exportData = logs.map(l => ({
         'รหัสธุรกรรม': l.id,
         'วันเวลา': formatDateStr(l.timestamp),
@@ -312,6 +332,7 @@ export const ReportPage: React.FC = () => {
     } else if (reportTab === 'run') {
       filename = `DCG_Smart_Service_รับส่งภายใน_${new Date().toISOString().split('T')[0]}`;
       const runLogs = logs.filter(l => l.type === 'run');
+      exportSourceLogs = runLogs;
       exportData = runLogs.map(l => ({
         'รหัสธุรกรรม': l.id,
         'วันเวลา': formatDateStr(l.timestamp),
@@ -325,6 +346,7 @@ export const ReportPage: React.FC = () => {
     } else if (reportTab === 'sort') {
       filename = `DCG_Smart_Service_คัดแยกนำจ่าย_${new Date().toISOString().split('T')[0]}`;
       const sortLogs = logs.filter(l => l.type === 'sort');
+      exportSourceLogs = sortLogs;
       exportData = sortLogs.map(l => ({
         'รหัสธุรกรรม': l.id,
         'วันเวลา': formatDateStr(l.timestamp),
@@ -338,6 +360,7 @@ export const ReportPage: React.FC = () => {
     } else if (reportTab === 'ext') {
       filename = `DCG_Smart_Service_นำส่งภายนอก_${new Date().toISOString().split('T')[0]}`;
       const extLogs = logs.filter(l => l.type === 'ext');
+      exportSourceLogs = extLogs;
       exportData = extLogs.map(l => {
         const parts = l.desc.split(' ');
         const serviceType = l.desc.includes(' ') ? parts[0] : l.desc;
@@ -387,6 +410,22 @@ export const ReportPage: React.FC = () => {
       exportData = Object.values(deptMap).sort((a, b) => b['ค่าส่งภายนอก (บาท)'] - a['ค่าส่งภายนอก (บาท)']);
     }
 
+    if (reportTab !== 'budget') {
+      exportData = exportData.map((row, index) => ({
+        ...row,
+        ...sourceColumns(exportSourceLogs[index]),
+      }));
+    } else {
+      exportData = exportData.map((row) => {
+        const deptName = String(Object.values(row)[0] || '');
+        const archiveRows = logs.filter((log) => (
+          log.sourceType === 'archive' &&
+          (getRealOwner(log.dept, masterData?.departments) || log.dept) === deptName
+        )).length;
+        return { ...row, 'Archive rows': archiveRows };
+      });
+    }
+
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'รายงานผล');
@@ -405,6 +444,27 @@ export const ReportPage: React.FC = () => {
     }
 
     XLSX.writeFile(wb, `${filename}.xlsx`);
+    const archiveLogs = (reportTab === 'budget' ? logs : exportSourceLogs)
+      .filter((log) => log.sourceType === 'archive');
+    if (archiveLogs.length > 0) {
+      const dateRange = getDateRange(filters);
+      void api.logStaffReportEvent({
+        action: 'staff_report_export',
+        queryText: filters.dept || '',
+        selectedDeptName: filters.dept || '',
+        dateMode: filters.dateMode,
+        startDate: dateRange.start,
+        endDate: dateRange.end,
+        fiscalYear: Array.from(new Set(archiveLogs.map((log) => log.sourceFiscalYear).filter(Boolean))).join(','),
+        resultCountRun: archiveLogs.filter((log) => log.type === 'run').length,
+        resultCountSort: archiveLogs.filter((log) => log.type === 'sort').length,
+        resultCountExt: archiveLogs.filter((log) => log.type === 'ext').length,
+        exportFormat: 'xlsx',
+        trackingMode: 'archive_report',
+        status: 'success',
+        userAgent: navigator.userAgent,
+      });
+    }
     setStatus({ type: 'success', text: 'ส่งออกไฟล์ Excel สำเร็จ' });
     setTimeout(() => setStatus(null), 3000);
   };
@@ -520,6 +580,18 @@ export const ReportPage: React.FC = () => {
                           <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-purple-50 dark:bg-purple-500/10 border border-purple-100 dark:border-purple-500/20 rounded text-[9px] text-purple-700 dark:text-purple-300 font-semibold">
                             <RefreshCw size={10} className="text-purple-700 dark:text-purple-300 animate-spin" aria-hidden="true" />
                             กำลังซิงค์
+                          </span>
+                        )}
+                        {log.syncStatus === 'auth_required' && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-50 dark:bg-amber-500/10 border border-amber-100 dark:border-amber-500/20 rounded text-[9px] text-amber-700 dark:text-amber-300 font-semibold">
+                            <CloudOff size={10} className="text-amber-700 dark:text-amber-300" aria-hidden="true" />
+                            รอ OTP
+                          </span>
+                        )}
+                        {log.syncStatus === 'failed' && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-rose-50 dark:bg-rose-500/10 border border-rose-100 dark:border-rose-500/20 rounded text-[9px] text-rose-700 dark:text-rose-300 font-semibold">
+                            <CloudOff size={10} className="text-rose-700 dark:text-rose-300" aria-hidden="true" />
+                            ซิงค์ไม่สำเร็จ
                           </span>
                         )}
                       </div>

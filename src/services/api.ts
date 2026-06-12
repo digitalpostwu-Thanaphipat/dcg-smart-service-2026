@@ -150,6 +150,24 @@ export const api = {
         }
     },
 
+    logStaffReportEvent: async (payload: any) => {
+        try {
+            const res = await fetch(API_URL, {
+                method: 'POST',
+                headers: JSON_HEADERS,
+                body: JSON.stringify({
+                    action: 'logStaffReportEvent',
+                    payload,
+                    auth: getAuthPayload()
+                })
+            });
+            return await handleJsonResponse(res);
+        } catch (err) {
+            console.warn('Staff report log event failed:', err);
+            return { status: 'error', message: 'staff report log event failed' };
+        }
+    },
+
     saveBatch: async (payload: any) => {
         const res = await fetch(API_URL, { 
             method: 'POST', 

@@ -236,4 +236,53 @@ describe('api self-service endpoints', () => {
             })
         });
     });
+
+    it('sends staff report log events with the staff session token', async () => {
+        sessionStorage.setItem('dcg_session_token', 'mock-session-token-456');
+        (fetch as any).mockResolvedValue({
+            json: async () => ({ status: 'success', data: { logged: true } }),
+        });
+
+        await api.logStaffReportEvent({
+            action: 'staff_report_export',
+            queryText: 'archive',
+            selectedDeptName: 'archive',
+            dateMode: 'custom',
+            startDate: '2025-09-01',
+            endDate: '2025-10-05',
+            fiscalYear: '2568',
+            resultCountRun: 1,
+            resultCountSort: 0,
+            resultCountExt: 0,
+            exportFormat: 'xlsx',
+            trackingMode: 'archive_report',
+            status: 'success',
+            userAgent: 'Chrome / Windows',
+        });
+
+        expect(fetch).toHaveBeenCalledWith(expect.any(String), {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({
+                action: 'logStaffReportEvent',
+                payload: {
+                    action: 'staff_report_export',
+                    queryText: 'archive',
+                    selectedDeptName: 'archive',
+                    dateMode: 'custom',
+                    startDate: '2025-09-01',
+                    endDate: '2025-10-05',
+                    fiscalYear: '2568',
+                    resultCountRun: 1,
+                    resultCountSort: 0,
+                    resultCountExt: 0,
+                    exportFormat: 'xlsx',
+                    trackingMode: 'archive_report',
+                    status: 'success',
+                    userAgent: 'Chrome / Windows',
+                },
+                auth: { sessionToken: 'mock-session-token-456' }
+            })
+        });
+    });
 });

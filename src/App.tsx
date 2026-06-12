@@ -173,6 +173,7 @@ function App() {
       setSessionToken(sessionToken);
       // Immediately fetch metadata using the newly acquired session token
       fetchMetaData(sessionToken);
+      syncEngine.syncPendingLogs();
     }
   };
 

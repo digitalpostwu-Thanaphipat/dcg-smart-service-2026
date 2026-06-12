@@ -1,5 +1,7 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
 
+export type SyncStatus = 'pending' | 'syncing' | 'synced' | 'auth_required' | 'failed';
+
 interface WUSTrackDB extends DBSchema {
   logs: {
     key: string;
@@ -8,7 +10,7 @@ interface WUSTrackDB extends DBSchema {
       type: 'run' | 'sort' | 'ext';
       data: any;
       timestamp: number;
-      syncStatus: 'pending' | 'syncing' | 'synced';
+      syncStatus: SyncStatus;
     };
     indexes: { 'by-type': string; 'by-status': string };
   };
@@ -72,7 +74,8 @@ export const saveLog = async (log: any) => {
 
 export const getPendingLogs = async () => {
   const db = await dbPromise;
-  return db.getAllFromIndex('logs', 'by-status', 'pending');
+  const allLogs = await db.getAll('logs');
+  return allLogs.filter((log) => log.syncStatus === 'pending' || log.syncStatus === 'auth_required');
 };
 
 export const getNonSyncedLogs = async () => {
@@ -81,7 +84,7 @@ export const getNonSyncedLogs = async () => {
   return allLogs.filter(l => l.syncStatus !== 'synced');
 };
 
-export const updateLogStatus = async (id: string, status: 'pending' | 'syncing' | 'synced') => {
+export const updateLogStatus = async (id: string, status: SyncStatus) => {
   const db = await dbPromise;
   const log = await db.get('logs', id);
   if (log) {

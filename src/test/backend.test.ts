@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -46,7 +46,21 @@ function createMockedBackend(mocks: Record<string, any>) {
     // Evaluate backend.gs
     ${backendGsContent}
     
-    return { handleFeedback, runAutoBackup, setupDailyBackupTrigger, applyBackupRetention, getSchemaAudit, ensureMasterUsersHeadersSync };
+    return {
+      handleFeedback,
+      runAutoBackup,
+      setupDailyBackupTrigger,
+      applyBackupRetention,
+      getSchemaAudit,
+      ensureMasterUsersHeadersSync,
+      runArchiveRollover,
+      searchLogsCrossYear,
+      publicSearchCrossYear,
+      logStaffReportEvent,
+      verifyOTP,
+      verifySelfServiceOTP,
+      requestSelfServiceOTP,
+    };
   `;
   
   try {
@@ -86,6 +100,108 @@ describe('backend.gs - sanitizeInput (CSV / Formula Injection prevention)', () =
     expect(sanitizeInput(123)).toBe(123);
     expect(sanitizeInput(true)).toBe(true);
     expect(sanitizeInput(null)).toBe(null);
+  });
+});
+
+describe('backend.gs - session expiry policy', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function createSheet(headers: string[], rows: any[][] = []) {
+    const values = [headers, ...rows];
+    const appendRow = vi.fn((row) => values.push(row));
+    return {
+      values,
+      appendRow,
+      getDataRange: vi.fn(() => ({ getValues: () => values })),
+      getLastRow: vi.fn(() => values.length),
+      getLastColumn: vi.fn(() => headers.length),
+      getRange: vi.fn((row: number, col: number) => ({
+        getValues: () => [headers],
+        getValue: () => values[row - 1]?.[col - 1] ?? '',
+        setValue: vi.fn((value) => {
+          values[row - 1] = values[row - 1] || [];
+          values[row - 1][col - 1] = value;
+        }),
+      })),
+    };
+  }
+
+  it('issues staff sessions through Friday end of day', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-10T09:30:00+07:00'));
+
+    const otpSheet = createSheet(
+      ['Email', 'OTPCode', 'OTPExpiresAt', 'SessionToken', 'SessionExpiresAt', 'FailedAttempts'],
+      [['staff@wu.ac.th', '123456', new Date('2026-06-10T09:45:00+07:00'), '', new Date(0), 0]],
+    );
+    const userSheet = createSheet(
+      ['UserID', 'Email', 'FullName', 'Role', 'Status'],
+      [['U001', 'staff@wu.ac.th', 'Staff User', 'staff', 'Active']],
+    );
+    const configSheet = createSheet(['Key', 'Value'], [['restrictWorkdays', 'true']]);
+    const spreadsheet = {
+      getSheetByName: vi.fn((name) => {
+        if (name === 'Tx_OTPStore') return otpSheet;
+        if (name === 'Master_Users') return userSheet;
+        if (name === 'System_Config') return configSheet;
+        return null;
+      }),
+    };
+    const backend = createMockedBackend({
+      SpreadsheetApp: { flush: vi.fn(), openById: vi.fn(() => spreadsheet), getActiveSpreadsheet: vi.fn(() => spreadsheet) },
+      PropertiesService: {
+        getScriptProperties: vi.fn(() => ({
+          getProperty: vi.fn((key) => (key === 'SPREADSHEET_ID' ? 'mock-spreadsheet' : null)),
+        })),
+      },
+      Utilities: {
+        getUuid: vi.fn(() => 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'),
+      },
+      console: { warn: vi.fn(), log: vi.fn(), error: vi.fn() },
+    });
+
+    const result = backend.verifyOTP({ email: 'staff@wu.ac.th', code: '123456' });
+
+    expect(result.sessionToken).toBe('ST-AAAAAAAABBBBCCCC');
+    const sessionExpiresAt = otpSheet.values[1][4] as Date;
+    expect(sessionExpiresAt.toISOString()).toBe('2026-06-12T16:59:59.999Z');
+  });
+
+  it('issues self-service sessions through current day only', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-10T09:30:00+07:00'));
+
+    const selfServiceOtpSheet = createSheet(
+      ['Email', 'OTPCode', 'OTPExpiresAt', 'SessionToken', 'SessionExpiresAt', 'FailedAttempts', 'LastRequestedAt'],
+      [['viewer@example.com', '654321', new Date('2026-06-10T09:45:00+07:00'), '', new Date(0), 0, new Date('2026-06-10T09:00:00+07:00')]],
+    );
+    const spreadsheet = {
+      getSheetByName: vi.fn((name) => {
+        if (name === 'Tx_SelfServiceOTPStore') return selfServiceOtpSheet;
+        return null;
+      }),
+      insertSheet: vi.fn(),
+    };
+    const backend = createMockedBackend({
+      SpreadsheetApp: { flush: vi.fn(), openById: vi.fn(() => spreadsheet), getActiveSpreadsheet: vi.fn(() => spreadsheet) },
+      PropertiesService: {
+        getScriptProperties: vi.fn(() => ({
+          getProperty: vi.fn((key) => (key === 'SPREADSHEET_ID' ? 'mock-spreadsheet' : null)),
+        })),
+      },
+      Utilities: {
+        getUuid: vi.fn(() => 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff'),
+      },
+      console: { warn: vi.fn(), log: vi.fn(), error: vi.fn() },
+    });
+
+    const result = backend.verifySelfServiceOTP({ email: 'viewer@example.com', code: '654321' });
+
+    expect(result.sessionToken).toBe('SS-BBBBBBBBCCCCDDDDEEEEFFFF');
+    const sessionExpiresAt = selfServiceOtpSheet.values[1][4] as Date;
+    expect(sessionExpiresAt.toISOString()).toBe('2026-06-10T16:59:59.999Z');
   });
 });
 
@@ -167,6 +283,240 @@ describe('backend.gs - schema guard read-only audit', () => {
     expect(logSheet.status).toBe('ok');
     expect(logSheet.headerCount).toBe(21);
     expect(insertSheet).not.toHaveBeenCalled();
+  });
+});
+
+describe('backend.gs - archive rollover safety', () => {
+  function createSheet(headers: string[], rows: any[][] = []) {
+    const values = [headers, ...rows];
+    return {
+      values,
+      appendRow: vi.fn((row) => values.push(row)),
+      getDataRange: vi.fn(() => ({ getValues: () => values })),
+      getLastRow: vi.fn(() => values.length),
+      getLastColumn: vi.fn(() => values[0]?.length || 0),
+      getRange: vi.fn((row: number, col: number, _numRows?: number, _numCols?: number) => ({
+        getValues: () => [values[row - 1] || []],
+        setValues: vi.fn((rowsToSet: any[][]) => {
+          rowsToSet.forEach((rowToSet, index) => {
+            values[row - 1 + index] = rowToSet;
+          });
+        }),
+        setValue: vi.fn((value) => {
+          values[row - 1] = values[row - 1] || [];
+          values[row - 1][col - 1] = value;
+        }),
+      })),
+    };
+  }
+
+  function createArchiveBackend(scriptProperties: Record<string, string> = {}) {
+    const runSheet = createSheet(
+      ['TxID', 'Timestamp', 'DeptName', 'Route', 'Round', 'ItemCount', 'Note', 'StaffEmail'],
+      [
+        ['RUN-OLD', new Date('2025-09-30T08:00:00+07:00'), 'Old Dept', 'A', 'AM', 1, '', 'staff@wu.ac.th'],
+        ['RUN-ACTIVE', new Date('2025-10-01T08:00:00+07:00'), 'Active Dept', 'A', 'AM', 2, '', 'staff@wu.ac.th'],
+      ],
+    );
+    const sortSheet = createSheet(
+      ['TxID', 'Timestamp', 'DeptName', 'NormalCount', 'RegisterCount', 'PrivateCount', 'Total', 'Note', 'StaffEmail'],
+      [
+        ['SORT-OLD', new Date('2025-09-29T08:00:00+07:00'), 'Old Dept', 1, 1, 0, 2, '', 'staff@wu.ac.th'],
+      ],
+    );
+    const extSheet = createSheet(
+      ['TxID', 'Timestamp', 'RequestingDept', 'ServiceType', 'Cost', 'ItemCount', 'TrackingNo', 'FundSource', 'StaffEmail'],
+      [
+        ['EXT-ACTIVE', new Date('2025-10-02T08:00:00+07:00'), 'Active Dept', 'EMS', 10, 1, 'RL1', 'WU', 'staff@wu.ac.th'],
+      ],
+    );
+    const archiveSheets: Record<string, any> = {};
+    const archiveIndex = createSheet(['placeholder'], []);
+    const selfServiceLogSheet = createSheet(
+      [
+        'Timestamp', 'Email', 'Action', 'QueryText', 'QueryMode', 'SelectedDeptName',
+        'BudgetOwnerEffective', 'MatchedDeptCount', 'DateMode', 'StartDate', 'EndDate',
+        'FiscalYear', 'ResultCountRun', 'ResultCountSort', 'ResultCountExt',
+        'ExportFormat', 'TrackingMode', 'Status', 'UserAgent', 'ErrorCode', 'ErrorMessage',
+      ],
+      [],
+    );
+    const sourceSS = {
+      getId: vi.fn(() => 'source-spreadsheet'),
+      getSheetByName: vi.fn((name) => {
+        if (name === 'Tx_InternalRun') return runSheet;
+        if (name === 'Tx_InternalSort') return sortSheet;
+        if (name === 'Tx_ExternalPost') return extSheet;
+        if (name === 'Tx_SelfServiceLog') return selfServiceLogSheet;
+        if (name === 'Archive_Index' && archiveIndex.values[0][0] !== 'placeholder') return archiveIndex;
+        return null;
+      }),
+      insertSheet: vi.fn((name) => {
+        if (name === 'Archive_Index') {
+          archiveIndex.values.length = 0;
+          return archiveIndex;
+        }
+        throw new Error(`unexpected source insert ${name}`);
+      }),
+    };
+    const archiveSS = {
+      getSheetByName: vi.fn((name) => archiveSheets[name] || null),
+      insertSheet: vi.fn((name) => {
+        archiveSheets[name] = createSheet([], []);
+        archiveSheets[name].values.length = 0;
+        return archiveSheets[name];
+      }),
+    };
+    const backend = createMockedBackend({
+      SpreadsheetApp: {
+        flush: vi.fn(),
+        openById: vi.fn((id) => (id === 'archive-spreadsheet' ? archiveSS : sourceSS)),
+        getActiveSpreadsheet: vi.fn(() => sourceSS),
+      },
+      PropertiesService: {
+        getScriptProperties: vi.fn(() => ({
+          getProperty: vi.fn((key) => scriptProperties[key] || (key === 'SPREADSHEET_ID' ? 'source-spreadsheet' : null)),
+        })),
+      },
+      Utilities: {
+        DigestAlgorithm: { SHA_256: 'SHA_256' },
+        computeDigest: vi.fn((_alg, text) => [String(text).length % 256, 7, 9]),
+      },
+      console: { warn: vi.fn(), log: vi.fn(), error: vi.fn() },
+    });
+
+    return { backend, sourceSS, archiveSS, runSheet, sortSheet, extSheet, archiveIndex, archiveSheets, selfServiceLogSheet };
+  }
+
+  it('returns a read-only dry-run archive plan without creating Archive_Index', () => {
+    const { backend, sourceSS } = createArchiveBackend();
+
+    const plan = backend.runArchiveRollover({ mode: 'dry_run', activeFiscalYear: 2569 });
+
+    expect(plan.mode).toBe('dry_run');
+    expect(plan.activeFiscalYear).toBe(2569);
+    expect(plan.totalRows).toBe(2);
+    expect(plan.sheets.find((sheet: any) => sheet.sheetName === 'Tx_InternalRun').rowCount).toBe(1);
+    expect(plan.sheets.find((sheet: any) => sheet.sheetName === 'Tx_InternalSort').rowCount).toBe(1);
+    expect(plan.sheets.find((sheet: any) => sheet.sheetName === 'Tx_ExternalPost').rowCount).toBe(0);
+    expect(sourceSS.insertSheet).not.toHaveBeenCalled();
+  });
+
+  it('blocks copy-only archive unless explicitly approved', () => {
+    const { backend, archiveSS } = createArchiveBackend({
+      ARCHIVE_SPREADSHEET_ID: 'archive-spreadsheet',
+    });
+
+    expect(() => backend.runArchiveRollover({ mode: 'copy_only', activeFiscalYear: 2569 }))
+      .toThrow('ARCHIVE_COPY_APPROVED');
+    expect(archiveSS.insertSheet).not.toHaveBeenCalled();
+  });
+
+  it('copies only old fiscal-year rows and writes Archive_Index without deleting active rows', () => {
+    const { backend, archiveSheets, archiveIndex, runSheet, sortSheet, extSheet } = createArchiveBackend({
+      ARCHIVE_COPY_APPROVED: 'true',
+      ARCHIVE_SPREADSHEET_ID: 'archive-spreadsheet',
+    });
+
+    const result = backend.runArchiveRollover({ mode: 'copy_only', activeFiscalYear: 2569 });
+
+    expect(result.mode).toBe('copy_only');
+    expect(result.deletePerformed).toBe(false);
+    expect(result.totalCopiedRows).toBe(2);
+    expect(archiveSheets.Tx_InternalRun.values).toHaveLength(2);
+    expect(archiveSheets.Tx_InternalRun.values[1][0]).toBe('RUN-OLD');
+    expect(archiveSheets.Tx_InternalSort.values).toHaveLength(2);
+    expect(archiveSheets.Tx_InternalSort.values[1][0]).toBe('SORT-OLD');
+    expect(archiveSheets.Tx_ExternalPost.values).toHaveLength(1);
+    expect(archiveIndex.values).toHaveLength(4);
+    expect(archiveIndex.values[1][7]).toBe('copy_only');
+    expect(archiveIndex.values[1][8]).toBe('copied_no_delete');
+    expect(runSheet.values).toHaveLength(3);
+    expect(sortSheet.values).toHaveLength(2);
+    expect(extSheet.values).toHaveLength(2);
+  });
+
+  it('blocks delete mode unless delete approval flag is enabled', () => {
+    const { backend } = createArchiveBackend();
+
+    expect(() => backend.runArchiveRollover({ mode: 'delete', activeFiscalYear: 2569 }))
+      .toThrow('ARCHIVE_DELETE_APPROVED');
+  });
+
+  it('routes cross-year staff reports to active and archive spreadsheets with source markers', () => {
+    const { backend, sourceSS, archiveSheets, archiveIndex, selfServiceLogSheet } = createArchiveBackend();
+    archiveIndex.values.length = 0;
+    archiveIndex.values.push(
+      ['Timestamp', 'FiscalYear', 'SourceSpreadsheetId', 'ArchiveSpreadsheetId', 'SheetName', 'RowCount', 'Checksum', 'Mode', 'Status'],
+      [new Date(), 2568, 'source-spreadsheet', 'archive-spreadsheet', 'Tx_InternalRun', 1, 'x', 'copy_only', 'copied_no_delete'],
+      [new Date(), 2568, 'source-spreadsheet', 'archive-spreadsheet', 'Tx_InternalSort', 1, 'x', 'copy_only', 'copied_no_delete'],
+      [new Date(), 2568, 'source-spreadsheet', 'archive-spreadsheet', 'Tx_ExternalPost', 1, 'x', 'copy_only', 'copied_no_delete'],
+    );
+    archiveSheets.Tx_InternalRun = createSheet(
+      ['TxID', 'Timestamp', 'DeptName', 'Route', 'Round', 'ItemCount', 'Note', 'StaffEmail'],
+      [['RUN-ARCHIVE', new Date('2025-09-15T08:00:00+07:00'), 'Old Dept', 'A', 'AM', 9, '', 'staff@wu.ac.th']],
+    );
+    archiveSheets.Tx_InternalSort = createSheet(
+      ['TxID', 'Timestamp', 'DeptName', 'NormalCount', 'RegisterCount', 'PrivateCount', 'Total', 'Note', 'StaffEmail'],
+      [['SORT-ARCHIVE', new Date('2025-09-16T08:00:00+07:00'), 'Old Dept', 1, 1, 1, 3, '', 'staff@wu.ac.th']],
+    );
+    archiveSheets.Tx_ExternalPost = createSheet(
+      ['TxID', 'Timestamp', 'RequestingDept', 'ServiceType', 'Cost', 'ItemCount', 'TrackingNo', 'FundSource', 'StaffEmail'],
+      [['EXT-ARCHIVE', new Date('2025-09-17T08:00:00+07:00'), 'Old Dept', 'EMS', 20, 2, 'RL2', 'WU', 'staff@wu.ac.th']],
+    );
+
+    const result = backend.searchLogsCrossYear({
+      filters: { startDate: '2025-09-01', endDate: '2025-10-05', dateMode: 'custom' },
+      email: 'staff@wu.ac.th',
+    }, { email: 'staff@wu.ac.th' });
+
+    expect(result.meta.archiveUsed).toBe(true);
+    expect(result.meta.fiscalYears).toEqual([2568, 2569]);
+    expect(result.run.map((row: any) => row.TxID).sort()).toEqual(['RUN-ACTIVE', 'RUN-ARCHIVE']);
+    expect(result.sort.map((row: any) => row.TxID)).toEqual(['SORT-ARCHIVE']);
+    expect(result.ext.map((row: any) => row.TxID).sort()).toEqual(['EXT-ACTIVE', 'EXT-ARCHIVE']);
+    expect(result.run.find((row: any) => row.TxID === 'RUN-ARCHIVE').SourceType).toBe('archive');
+    expect(result.run.find((row: any) => row.TxID === 'RUN-ACTIVE').SourceType).toBe('active');
+    expect(selfServiceLogSheet.values).toHaveLength(2);
+    expect(selfServiceLogSheet.values[1][1]).toBe('staff@wu.ac.th');
+    expect(selfServiceLogSheet.values[1][2]).toBe('staff_report_search');
+    expect(selfServiceLogSheet.values[1][16]).toBe('archive_report');
+    expect(sourceSS.insertSheet).not.toHaveBeenCalled();
+    expect(archiveSheets.Tx_InternalRun.appendRow).not.toHaveBeenCalled();
+  });
+
+  it('routes self-service cross-year search to archive in read/report mode only', () => {
+    const { backend, sourceSS, archiveSheets, archiveIndex } = createArchiveBackend();
+    archiveIndex.values.length = 0;
+    archiveIndex.values.push(
+      ['Timestamp', 'FiscalYear', 'SourceSpreadsheetId', 'ArchiveSpreadsheetId', 'SheetName', 'RowCount', 'Checksum', 'Mode', 'Status'],
+      [new Date(), 2568, 'source-spreadsheet', 'archive-spreadsheet', 'Tx_InternalRun', 1, 'x', 'copy_only', 'copied_no_delete'],
+    );
+    archiveSheets.Tx_InternalRun = createSheet(
+      ['TxID', 'Timestamp', 'DeptName', 'Route', 'Round', 'ItemCount', 'Note', 'StaffEmail'],
+      [['RUN-ARCHIVE', new Date('2025-09-15T08:00:00+07:00'), 'Old Dept', 'A', 'AM', 9, '', 'staff@wu.ac.th']],
+    );
+    archiveSheets.Tx_InternalSort = createSheet(
+      ['TxID', 'Timestamp', 'DeptName', 'NormalCount', 'RegisterCount', 'PrivateCount', 'Total', 'Note', 'StaffEmail'],
+      [],
+    );
+    archiveSheets.Tx_ExternalPost = createSheet(
+      ['TxID', 'Timestamp', 'RequestingDept', 'ServiceType', 'Cost', 'ItemCount', 'TrackingNo', 'FundSource', 'StaffEmail'],
+      [],
+    );
+
+    const result = backend.publicSearchCrossYear({
+      deptName: 'Old Dept',
+      startDate: '2025-09-01',
+      endDate: '2025-09-30',
+    });
+
+    expect(result.meta.archiveUsed).toBe(true);
+    expect(result.run).toHaveLength(1);
+    expect(result.run[0].sourceType).toBe('archive');
+    expect(result.run[0].sourceFiscalYear).toBe(2568);
+    expect(sourceSS.insertSheet).not.toHaveBeenCalled();
+    expect(archiveSheets.Tx_InternalRun.appendRow).not.toHaveBeenCalled();
   });
 });
 

@@ -353,6 +353,8 @@ export const PublicTrackView: React.FC<PublicTrackViewProps> = ({ onBack, initia
       return;
     }
 
+    const exportUsesArchive = [...filteredRunData, ...filteredSortData, ...filteredExtData]
+      .some((item: any) => item.sourceType === 'archive');
     const payloadBase = {
       email: selfServiceEmail,
       queryText: selectedContext.deptName,
@@ -368,7 +370,7 @@ export const PublicTrackView: React.FC<PublicTrackViewProps> = ({ onBack, initia
       resultCountSort: filteredSortData.length,
       resultCountExt: filteredExtData.length,
       exportFormat: 'xlsx',
-      trackingMode: 'masked',
+      trackingMode: exportUsesArchive ? 'masked_archive' : 'masked',
       userAgent: summarizeUserAgent(navigator.userAgent),
     };
 
@@ -426,6 +428,8 @@ export const PublicTrackView: React.FC<PublicTrackViewProps> = ({ onBack, initia
       return;
     }
 
+    const exportUsesArchive = [...filteredRunData, ...filteredSortData, ...filteredExtData]
+      .some((item: any) => item.sourceType === 'archive');
     const payloadBase = {
       email: selfServiceEmail,
       queryText: selectedContext.deptName,
@@ -441,7 +445,7 @@ export const PublicTrackView: React.FC<PublicTrackViewProps> = ({ onBack, initia
       resultCountSort: filteredSortData.length,
       resultCountExt: filteredExtData.length,
       exportFormat: 'print',
-      trackingMode: 'masked',
+      trackingMode: exportUsesArchive ? 'masked_archive' : 'masked',
       userAgent: summarizeUserAgent(navigator.userAgent),
     };
 
