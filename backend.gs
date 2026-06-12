@@ -7,9 +7,9 @@ var SPREADSHEET_ID =
   PropertiesService.getScriptProperties().getProperty("SPREADSHEET_ID") || "";
 
 var CRITICAL_SCHEMA_HEADERS = {
-  Master_Users: ["UserID", "Email", "FullName", "Role", "Department", "IsActive"],
-  Master_Departments: ["DeptID", "DeptName", "RouteGroup", "Building", "Floor", "BudgetOwner"],
-  Master_Services: ["ServiceID", "ServiceName", "DefaultCost"],
+  Master_Users: ["UserID", "Email", "FullName", "Role", "Status"],
+  Master_Departments: ["DeptID", "DeptName", "Building", "Floor", "RouteGroup", "BudgetOwner"],
+  Master_Services: ["ServiceID", "ServiceName", "Description"],
   Tx_InternalRun: ["TxID", "Timestamp", "DeptName", "Route", "Round", "ItemCount", "Note", "StaffEmail"],
   Tx_InternalSort: ["TxID", "Timestamp", "DeptName", "NormalCount", "RegisterCount", "PrivateCount", "Total", "Note", "StaffEmail"],
   Tx_ExternalPost: ["TxID", "Timestamp", "RequestingDept", "ServiceType", "Cost", "ItemCount", "TrackingNo", "FundSource", "StaffEmail"],
@@ -37,7 +37,7 @@ var CRITICAL_SCHEMA_HEADERS = {
     "ErrorCode",
     "ErrorMessage",
   ],
-  Feedback_Reports: ["Timestamp", "StaffEmail", "Type", "Severity", "Description", "UserAgent", "Status"],
+  Feedback_Reports: ["Timestamp", "StaffEmail", "FeedbackType", "Severity", "Description"],
 };
 
 /**
