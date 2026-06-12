@@ -262,3 +262,17 @@
   * **[Build & Verification]:** ทำการทดสอบ Unit Tests (`npm run test`) สำเร็จทั้งหมด 64 เคส (`64/64 tests passed`) และ TypeScript Type Check ผ่านสำเร็จ
   * **[Git Upload]:** บันทึกการเปลี่ยนแปลง (Commit) และอัปโหลด (Push) ขึ้น GitHub Repository (`digitalpostwu-Thanaphipat/dcg-smart-service-2026`) สาขา `main`
 
+---
+
+### Phase 14: Production Improvement Plan and Session Policy Decision — 12 มิถุนายน 2569
+
+* **เอกสารแผนงานหลัก:** เพิ่ม `docs/production_improvement_tasks.md` เพื่อเก็บแผนปรับปรุง production, task backlog, acceptance criteria, risk, และ skills ที่ต้องใช้ในแต่ละแนวงาน
+* **เหตุผลที่แยกเอกสาร:** `docs/log.md` ใช้เป็นบันทึกเหตุการณ์และสถานะล่าสุด ส่วนแผนงานยาวเก็บแยกเพื่อไม่ให้ log ปนกับ backlog
+* **สถานะ production ล่าสุด:** เว็บ Vercel ใช้งานได้ปกติ และชี้ไป Apps Script Web App version `35`
+* **สถานะ schema:** `backend.gs` ส่วน `CRITICAL_SCHEMA_HEADERS` ตรงกับ production sheet ปัจจุบันแล้ว และ `Tx_SelfServiceLog` ตรวจแล้วมี 21 คอลัมน์
+* **หมายเหตุแทนบันทึก v31 เดิม:** บันทึก Phase 8 ที่กล่าวถึง v31/rollback เป็นบริบทเก่าแล้ว สถานะใช้งานจริงปัจจุบันคือ Apps Script Web App v35
+* **BACKEND_VERSION:** ค่า `2026-06-11-v31-schema-audit` ใน `getHealth` เป็น health/debug string ในโค้ด ไม่ใช่เลข deployment version จึงยังไม่ควร deploy backend เพื่อแก้ string อย่างเดียวระหว่าง production ใช้งานจริง
+* **แนวทางอัปเดต BACKEND_VERSION:** ให้แก้พร้อม backend change รอบถัดไป เช่น session policy/offline sync แล้ว deploy เป็น version label ใหม่พร้อม smoke test
+* **Session policy ที่ตกลงเป็นทิศทาง:** staff token ควรใช้ได้จันทร์-ศุกร์เพื่อลด friction งานบันทึกข้อมูล ส่วน self-service token ให้พิจารณา daily เป็นค่าแนะนำสำหรับผู้ใช้หน่วยงาน
+* **Offline Session Caching:** อนุญาต read/report cache แบบ read-only และเก็บ pending writes ไว้ในเครื่อง แต่การ sync/write ขึ้น backend ต้อง re-auth หาก token หมดอายุ
+* **Skills ที่ระบุในแผน:** `grill-me`, `caveman`, `diagnose`, `review`, `tdd`, `playwright`, `gws-sheets`, `handoff`
