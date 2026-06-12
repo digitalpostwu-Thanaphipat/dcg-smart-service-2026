@@ -4,12 +4,12 @@
 
 Updated: 12 June 2026
 
-Status: local guard prepared, not deployed.
+Status: deployed to Apps Script production deployments on 12 June 2026.
 
 - `getSchemaAudit` remains read-only by default.
 - Schema repair remains blocked unless Script Property `SCHEMA_REPAIR_APPROVED=true`.
 - Release checklist added at `docs/phase-e-production-release-guard.md`.
-- Production still uses current deployed Apps Script/Vercel state until explicit push/deploy approval.
+- Apps Script backend was pushed with `clasp push --force`, versioned as `38`, and redeployed to the existing production deployment URLs.
 - Current Phase E local verification:
   - `npm.cmd run test` passed 78 tests.
   - `npm.cmd run build` passed.
@@ -23,10 +23,11 @@ Status: local guard prepared, not deployed.
 
 - Frontend production: `https://dcg-smart-service-2026.vercel.app`
 - Frontend status: ใช้งานได้ ตรวจแล้ว HTTP `200`
-- Active Apps Script Web App URL: `https://script.google.com/macros/s/AKfycbwSosmXqRi1ByBBMo5h06JkIn0Zc1x4NI9at-btDns8obmcAHuNSCwTNFUwlgpNJqiczw/exec`
-- Apps Script deployment: version `35`
+- Active Apps Script Web App URL: `https://script.google.com/macros/s/AKfycbyhXXtSjtMvbeGWB4VEsFFo_zLQJ_3BGfXNpX1MByDC3EpuWCkEk-5VfCrUjODm-4jSFg/exec`
+- Fallback Apps Script Web App URL in `src/config.ts`: `https://script.google.com/macros/s/AKfycbwSosmXqRi1ByBBMo5h06JkIn0Zc1x4NI9at-btDns8obmcAHuNSCwTNFUwlgpNJqiczw/exec`
+- Apps Script deployment: version `38`
 - API health status: ใช้งานได้ ตรวจแล้ว HTTP `200`
-- หมายเหตุ: `getHealth` ยังแสดง `backendVersion` เป็น `2026-06-11-v31-schema-audit` เพราะเป็นค่าคงที่ในโค้ด ไม่ใช่เลข Apps Script deployment version
+- หมายเหตุ: `getHealth` ควรแสดง `backendVersion` เป็น `2026-06-12-v35-session-policy`; ค่านี้เป็น label ในโค้ด ไม่ใช่เลข Apps Script deployment version `38`
 
 ## สรุปคำตอบ
 
@@ -120,4 +121,13 @@ Phase 8 schema guard เป็น read-only โดยค่าเริ่มต
 
 ## งานที่ยังควรทำ
 
-อัปเดต `BACKEND_VERSION` ใน `backend.gs` ให้สะท้อน deployment ปัจจุบัน เช่น `2026-06-12-v35-schema-aligned` เพื่อกันสับสนระหว่างเลข deployment version กับ backend health string
+หลัง deploy v38 แล้ว `BACKEND_VERSION` ใน `backend.gs` คือ `2026-06-12-v35-session-policy`; ยังควรใช้ smoke test จริงเพื่อยืนยันค่าจาก production response
+
+## Apps Script Backend Deploy v38
+
+- Deploy date: 12 June 2026
+- `clasp push --force`: completed
+- Apps Script version: `38`
+- Production deployment `AKfycbyhXXtSjtMvbeGWB4VEsFFo_zLQJ_3BGfXNpX1MByDC3EpuWCkEk-5VfCrUjODm-4jSFg`: redeployed to `@38`
+- Fallback deployment `AKfycbwSosmXqRi1ByBBMo5h06JkIn0Zc1x4NI9at-btDns8obmcAHuNSCwTNFUwlgpNJqiczw`: redeployed to `@38`
+- Direct backend smoke test from PowerShell was inconclusive due `401`/remote connection errors; browser smoke test remains required before marking Phase E fully closed.

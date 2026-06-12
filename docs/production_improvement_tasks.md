@@ -5,11 +5,12 @@
 ## สถานะตั้งต้น
 
 - Production frontend: `https://dcg-smart-service-2026.vercel.app`
-- Active Apps Script Web App: version `35`
-- Active API URL: `https://script.google.com/macros/s/AKfycbwSosmXqRi1ByBBMo5h06JkIn0Zc1x4NI9at-btDns8obmcAHuNSCwTNFUwlgpNJqiczw/exec`
+- Active Apps Script Web App: version `38`
+- Active API URL: `https://script.google.com/macros/s/AKfycbyhXXtSjtMvbeGWB4VEsFFo_zLQJ_3BGfXNpX1MByDC3EpuWCkEk-5VfCrUjODm-4jSFg/exec`
+- Fallback API URL in `src/config.ts`: `https://script.google.com/macros/s/AKfycbwSosmXqRi1ByBBMo5h06JkIn0Zc1x4NI9at-btDns8obmcAHuNSCwTNFUwlgpNJqiczw/exec`
 - Schema guard ใน `backend.gs` ตรงกับ production sheet ปัจจุบันแล้ว
 - `Tx_SelfServiceLog` ตรวจแล้วมี 21 คอลัมน์
-- `BACKEND_VERSION` ใน `getHealth` ยังเป็น `2026-06-11-v31-schema-audit` เพราะเป็นค่าคงที่ในโค้ด ไม่ใช่เลข Apps Script deployment
+- `BACKEND_VERSION` ใน `getHealth` ปรับใน backend รอบนี้เป็น `2026-06-12-v35-session-policy`; Apps Script deployment ล่าสุดคือ version `38`
 
 ## หลักการตัดสินใจ
 
@@ -34,7 +35,7 @@
 
 เป้าหมาย: ลดการขอ OTP ซ้ำของพนักงาน แต่ยังคุม write ด้วย backend auth
 
-สถานะ local: เสร็จและตรวจผ่านแล้ว ยังไม่ push GitHub และยังไม่ deploy Apps Script
+สถานะ production: เสร็จ ตรวจผ่านใน local แล้ว push GitHub และ deploy Apps Script version `38` แล้ว
 
 Tasks:
 
@@ -70,7 +71,7 @@ Risk:
 
 เป้าหมาย: อินเทอร์เน็ตไม่เสถียรแล้วข้อมูลพนักงานไม่หาย และไม่บังคับขอ OTP ใหม่ทันทีถ้าแค่อ่าน cache
 
-สถานะ local: เสร็จและตรวจผ่านแล้ว ยังไม่ push GitHub และยังไม่ deploy Apps Script
+สถานะ production: เสร็จ ตรวจผ่านใน local แล้ว push GitHub และ deploy Apps Script version `38` แล้ว
 
 Tasks:
 
@@ -105,7 +106,7 @@ Risk:
 
 เป้าหมาย: ให้ active spreadsheet เล็กและเร็ว โดยย้ายข้อมูลเก่าไป archive ทุกปีงบประมาณ
 
-สถานะ local: เสร็จเฉพาะ dry-run/copy-only safety scaffold และตรวจผ่านแล้ว ยังไม่ push GitHub, ยังไม่ deploy Apps Script, ยังไม่ลบข้อมูล active
+สถานะ production: dry-run/copy-only safety scaffold ตรวจผ่านใน local แล้ว push GitHub และ deploy Apps Script version `38` แล้ว; ยังไม่ลบข้อมูล active
 
 Tasks:
 
@@ -174,7 +175,7 @@ Tasks:
 
 - [ ] เก็บ `getSchemaAudit` เป็น read-only default
 - [ ] ห้าม schema repair เว้นแต่ตั้ง `SCHEMA_REPAIR_APPROVED=true`
-- [ ] ก่อน deploy backend: backup `backend.gs` และจด active deployment URL
+- [x] ก่อน deploy backend: backup `backend.gs` และจด active deployment URL
 - [ ] หลัง deploy backend: verify `getHealth`, schema audit, login, write, self-service search
 - [ ] ก่อน deploy frontend: verify Vercel env `VITE_API_URL`
 - [ ] หลัง deploy frontend: verify production HTTP 200 และ asset bundle เปลี่ยนจริง
@@ -226,7 +227,7 @@ Acceptance:
 
 ## Phase D Local Status: Cross-Year Read/Report Mode
 
-สถานะ local: ทำ backend routing และ self-service archive event marker แล้ว ยังไม่ push GitHub และยังไม่ deploy Apps Script/Vercel
+สถานะ production: ทำ backend routing และ self-service archive event marker แล้ว push GitHub และ deploy Apps Script version `38` แล้ว
 
 Implemented locally:
 
@@ -261,7 +262,7 @@ Verification:
 
 ## Phase D Gap Closure: Staff Export and Staff Archive Audit
 
-สถานะ local: ปิด 2 gap ของ Phase D แล้ว ยังไม่ push GitHub และยังไม่ deploy
+สถานะ production: ปิด 2 gap ของ Phase D แล้ว push GitHub และ deploy Apps Script version `38` แล้ว
 
 Implemented locally:
 
@@ -290,7 +291,7 @@ Verification:
 
 ## Phase E Local Status: Schema and Production Release Guard
 
-สถานะ local: เริ่ม Phase E แล้ว ทำ checklist/guard artifacts แล้ว ยังไม่ push GitHub และยังไม่ deploy
+สถานะ production: Phase E checklist/guard artifacts พร้อมใช้งานแล้ว push GitHub และ deploy Apps Script version `38` แล้ว
 
 Implemented locally:
 
@@ -310,7 +311,7 @@ Completed Phase E tasks locally:
 
 Still open for real production release:
 
-- [ ] ก่อน deploy backend: backup `backend.gs` และจด active deployment URL
+- [x] ก่อน deploy backend: backup `backend.gs` และจด active deployment URL
 - [ ] หลัง deploy backend: verify `getHealth`, schema audit, login, write, self-service search
 - [ ] ก่อน deploy frontend: verify Vercel env `VITE_API_URL`
 - [ ] หลัง deploy frontend: verify production HTTP 200 และ asset bundle เปลี่ยนจริง

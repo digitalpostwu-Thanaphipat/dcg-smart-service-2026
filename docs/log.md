@@ -341,3 +341,14 @@
 * **Schema repair guard:** `ensureMasterUsersHeadersSync` block write/delete ถ้าไม่มี `SCHEMA_REPAIR_APPROVED=true`
 * **Production report:** อัปเดต `docs/production_schema_audit_report.md` ระบุ Phase E local guard prepared, not deployed
 * **Deploy rule:** ยังต้อง backup `backend.gs`, จด active deployment URL, verify Vercel `VITE_API_URL`, และ smoke test จริงหลัง deploy ก่อนถือว่า Phase E production complete
+
+### Phase E Production Deploy: Apps Script Backend v38 - 12 June 2026
+
+* **GitHub backup commit:** `5b43c2de feat: add archive reporting and release guard`
+* **Local backup:** `docs/backups/20260612-163624/`
+* **clasp push:** completed with `clasp.cmd push --force`; pushed `appsscript.json` and `backend.gs`
+* **Apps Script version:** created version `38` with description `Production backend 2026-06-12 session archive guard`
+* **Production deployment URL:** redeployed `AKfycbyhXXtSjtMvbeGWB4VEsFFo_zLQJ_3BGfXNpX1MByDC3EpuWCkEk-5VfCrUjODm-4jSFg` to `@38`
+* **Fallback deployment URL in repo config:** redeployed `AKfycbwSosmXqRi1ByBBMo5h06JkIn0Zc1x4NI9at-btDns8obmcAHuNSCwTNFUwlgpNJqiczw` to `@38`
+* **Vercel check:** `https://dcg-smart-service-2026.vercel.app` returned HTTP `200` once during post-deploy verification; later PowerShell checks were unstable with remote connection errors
+* **Backend direct smoke test:** direct `getHealth` from PowerShell was inconclusive (`401`/connection errors), so browser/user smoke test is still required before marking Phase E production complete
