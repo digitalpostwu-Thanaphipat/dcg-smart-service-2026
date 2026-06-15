@@ -358,9 +358,10 @@
 ### Phase E Development & Production Sync: PWA & CORS Fixes - 15 June 2026
 
 * **สถานะ:** อัปโหลดขึ้น GitHub และทวนสอบระบบสำเร็จเรียบร้อย
-* **GitHub backup commit:** `7ecae467 fix(vite): use devOptions.enabled=false to disable SW in DEV mode` และ `073bfdbe fix: resolve CORS/fetch failures in DEV and production`
+* **GitHub backup commit:** `7ea51c2f ci: fix timezone for test suite in GitHub Actions`, `7ecae467 fix(vite): use devOptions.enabled=false to disable SW in DEV mode` และ `073bfdbe fix: resolve CORS/fetch failures in DEV and production`
+* **GitHub Actions Timezone Fix:** แก้ไขปัญหาการรัน Vitest ใน GitHub Actions Runner ล้มเหลวเนื่องจากความแตกต่างของ Timezone (UTC vs GMT+7) โดยการกำหนด `TZ: Asia/Bangkok` ในระดับ Job ของไฟล์ workflow `.github/workflows/ci.yml` ทำให้สถานะการเช็คผ่าน (Green) 100%
 * **CORS Diagnostic UI:** เพิ่มการแสดงแถบ `Connection Diagnostic` ตอนเริ่มต้นระบบใน `src/App.tsx` เพื่อเช็คและเตือนทันทีหาก `api.checkConnection()` ล้มเหลว พร้อมมีปุ่มโหลดหน้าเว็บใหม่
 * **CORS & Network Error Handling:** ปรับข้อความเตือนในหน้า `LoginView.tsx` ภาษาไทยให้มีความเข้าใจง่ายและแนะนำแนวทางแก้ไขกรณีจับข้อผิดพลาดประเภท `CORS`, `Failed to fetch`, หรือ `NetworkError`
 * **Vite Proxy:** กำหนดค่า Proxy ท้องถิ่นใน `vite.config.ts` ให้ส่งผ่าน `/api` ไปยังปลายทาง Apps Script ของแท้เพื่อตัดปัญหาสิทธิ์ CORS บนหน้า localhost และชี้ `API_URL` ไปที่ `/api/exec` เมื่อเป็นโหมดพัฒนา (DEV)
 * **Service Worker DEV Toggle:** ปิดใช้งาน Service Worker ในโหมด DEV ผ่านการกำหนด `devOptions.enabled=false` เพื่อไม่ให้มันบล็อกหรือแทรกแซงการยิง API ในเครื่องพัฒนา
-* **Verification:** รัน `npm run test` ผ่าน 78/78 tests และทำการ build ระบบ `npm run build` สำเร็จ 100%
+* **Verification:** รัน `npm run test` ผ่าน 78/78 tests และทำการ build ระบบ `npm run build` สำเร็จ 100% (ทวนสอบผ่านเกณฑ์ทั้งในเครื่องโลคอลและบน GitHub Actions CI เรียบร้อยแล้ว)
