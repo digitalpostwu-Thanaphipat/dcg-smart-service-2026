@@ -28,8 +28,11 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [
     react(),
-    mode === 'production' && VitePWA({
+    mode !== 'test' && VitePWA({
       registerType: 'prompt',
+      // Disable Service Worker in DEV to prevent it from intercepting
+      // API calls and bypassing the Vite proxy (prevents CORS errors on localhost)
+      devOptions: { enabled: false },
       includeAssets: ['pwa_app_icon.png', 'icon-192.png', 'icon-512.png', 'vite.svg'],
       manifest: {
         name: 'DCG Smart Service',

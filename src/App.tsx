@@ -40,10 +40,15 @@ function App() {
     setIsOnline
   } = useAppStore();
 
+  // useRegisterSW is provided by VitePWA virtual module.
+  // In DEV mode (VitePWA disabled), it returns safe no-op defaults.
   const {
     needRefresh: [needRefresh, setNeedRefresh],
     updateServiceWorker,
-  } = useRegisterSW();
+  } = useRegisterSW({
+    onRegisteredSW(_swScriptUrl, _registration) {},
+    onRegisterError(_error) {},
+  });
 
   const [showPublicTrack, setShowPublicTrack] = useState(false);
   const [initialPublicDept, setInitialPublicDept] = useState('');
