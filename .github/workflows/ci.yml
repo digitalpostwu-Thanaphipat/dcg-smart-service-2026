@@ -11,6 +11,8 @@ on:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    env:
+      TZ: Asia/Bangkok
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
