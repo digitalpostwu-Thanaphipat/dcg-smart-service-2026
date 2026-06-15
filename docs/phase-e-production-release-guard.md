@@ -4,14 +4,13 @@ Updated: 12 June 2026
 
 Scope: backend/frontend production release safety only. This document does not approve deploy by itself.
 
-## Current Local Status
+## Current Local Status (As of 15 June 2026)
 
-- Phase A-D code changes are local only.
-- GitHub push is not done.
-- Apps Script deploy is not done.
-- Vercel production is not updated from this local work.
-- Current production frontend remains `https://dcg-smart-service-2026.vercel.app`.
-- Current production Apps Script Web App URL remains `https://script.google.com/macros/s/AKfycbwSosmXqRi1ByBBMo5h06JkIn0Zc1x4NI9at-btDns8obmcAHuNSCwTNFUwlgpNJqiczw/exec`.
+- Phase A-D code changes are pushed to GitHub.
+- Apps Script deploy is completed (Version 38).
+- Vercel production deployment is updated and live (Commit `67cb5a10` / `7ea51c2f`).
+- Current production frontend is `https://dcg-smart-service-2026.vercel.app`.
+- Current active production Apps Script Web App URL is `https://script.google.com/macros/s/AKfycbwSosmXqRi1ByBBMo5h06JkIn0Zc1x4NI9at-btDns8obmcAHuNSCwTNFUwlgpNJqiczw/exec`.
 
 ## Release Rule
 

@@ -149,13 +149,13 @@ Risk:
 
 Tasks:
 
-- [ ] เพิ่ม filter fiscal year / date range ที่รองรับหลายปี
-- [ ] Backend route current year ไป active spreadsheet
-- [ ] Backend route old year ไป archive spreadsheet ผ่าน `Archive_Index`
-- [ ] รวมผลหลายปีใน response เดียว โดยระบุ source year/source archive
-- [ ] Export/print รายงานข้ามปีได้
-- [ ] Archive mode เป็น read/report only ห้ามแก้ไขข้อมูล archive จากหน้าใช้งาน
-- [ ] Log event ทุกครั้งที่ค้น/export archive
+- [x] เพิ่ม filter fiscal year / date range ที่รองรับหลายปี
+- [x] Backend route current year ไป active spreadsheet
+- [x] Backend route old year ไป archive spreadsheet ผ่าน `Archive_Index`
+- [x] รวมผลหลายปีใน response เดียว โดยระบุ source year/source archive
+- [x] Export/print รายงานข้ามปีได้
+- [x] Archive mode เป็น read/report only ห้ามแก้ไขข้อมูล archive จากหน้าใช้งาน
+- [x] Log event ทุกครั้งที่ค้น/export archive
 
 Acceptance:
 
@@ -173,14 +173,14 @@ Risk:
 
 Tasks:
 
-- [ ] เก็บ `getSchemaAudit` เป็น read-only default
-- [ ] ห้าม schema repair เว้นแต่ตั้ง `SCHEMA_REPAIR_APPROVED=true`
+- [x] เก็บ `getSchemaAudit` เป็น read-only default
+- [x] ห้าม schema repair เว้นแต่ตั้ง `SCHEMA_REPAIR_APPROVED=true`
 - [x] ก่อน deploy backend: backup `backend.gs` และจด active deployment URL
-- [ ] หลัง deploy backend: verify `getHealth`, schema audit, login, write, self-service search
-- [ ] ก่อน deploy frontend: verify Vercel env `VITE_API_URL`
-- [ ] หลัง deploy frontend: verify production HTTP 200 และ asset bundle เปลี่ยนจริง
-- [ ] อัปเดต `docs/production_schema_audit_report.md` เมื่อมี deployment สำคัญ
-- [ ] อัปเดต `docs/log.md` เฉพาะ status summary
+- [x] หลัง deploy backend: verify `getHealth`, schema audit, login, write, self-service search
+- [x] ก่อน deploy frontend: verify Vercel env `VITE_API_URL`
+- [x] หลัง deploy frontend: verify production HTTP 200 และ asset bundle เปลี่ยนจริง
+- [x] อัปเดต `docs/production_schema_audit_report.md` เมื่อมี deployment สำคัญ
+- [x] อัปเดต `docs/log.md` เฉพาะ status summary
 
 Acceptance:
 
