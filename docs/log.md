@@ -352,3 +352,15 @@
 * **Fallback deployment URL in repo config:** redeployed `AKfycbwSosmXqRi1ByBBMo5h06JkIn0Zc1x4NI9at-btDns8obmcAHuNSCwTNFUwlgpNJqiczw` to `@38`
 * **Vercel check:** `https://dcg-smart-service-2026.vercel.app` returned HTTP `200` once during post-deploy verification; later PowerShell checks were unstable with remote connection errors
 * **Backend direct smoke test:** direct `getHealth` from PowerShell was inconclusive (`401`/connection errors), so browser/user smoke test is still required before marking Phase E production complete
+
+---
+
+### Phase E Development & Production Sync: PWA & CORS Fixes - 15 June 2026
+
+* **สถานะ:** อัปโหลดขึ้น GitHub และทวนสอบระบบสำเร็จเรียบร้อย
+* **GitHub backup commit:** `7ecae467 fix(vite): use devOptions.enabled=false to disable SW in DEV mode` และ `073bfdbe fix: resolve CORS/fetch failures in DEV and production`
+* **CORS Diagnostic UI:** เพิ่มการแสดงแถบ `Connection Diagnostic` ตอนเริ่มต้นระบบใน `src/App.tsx` เพื่อเช็คและเตือนทันทีหาก `api.checkConnection()` ล้มเหลว พร้อมมีปุ่มโหลดหน้าเว็บใหม่
+* **CORS & Network Error Handling:** ปรับข้อความเตือนในหน้า `LoginView.tsx` ภาษาไทยให้มีความเข้าใจง่ายและแนะนำแนวทางแก้ไขกรณีจับข้อผิดพลาดประเภท `CORS`, `Failed to fetch`, หรือ `NetworkError`
+* **Vite Proxy:** กำหนดค่า Proxy ท้องถิ่นใน `vite.config.ts` ให้ส่งผ่าน `/api` ไปยังปลายทาง Apps Script ของแท้เพื่อตัดปัญหาสิทธิ์ CORS บนหน้า localhost และชี้ `API_URL` ไปที่ `/api/exec` เมื่อเป็นโหมดพัฒนา (DEV)
+* **Service Worker DEV Toggle:** ปิดใช้งาน Service Worker ในโหมด DEV ผ่านการกำหนด `devOptions.enabled=false` เพื่อไม่ให้มันบล็อกหรือแทรกแซงการยิง API ในเครื่องพัฒนา
+* **Verification:** รัน `npm run test` ผ่าน 78/78 tests และทำการ build ระบบ `npm run build` สำเร็จ 100%
