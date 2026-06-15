@@ -73,7 +73,14 @@ function doGet(e) {
  * @returns {TextOutput} ข้อมูล JSON ผลการประมวลผลของ Action ต่าง ๆ
  */
 function doPost(e) {
-  var json = JSON.parse(e.postData.contents);
+  var json;
+  try {
+    json = JSON.parse(e.postData.contents);
+  } catch (parseError) {
+    return ContentService.createTextOutput(
+      JSON.stringify({ status: 'error', message: 'คำขอไม่ถูกต้อง (Invalid JSON)' })
+    ).setMimeType(ContentService.MimeType.JSON);
+  }
   var action = json.action;
   var payload = json.payload;
   var auth = json.auth || {};

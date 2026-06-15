@@ -58,7 +58,12 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onShowPublic }) =
         setErrorMsg(res.message || 'ไม่สามารถร้องขอรหัส OTP ได้');
       }
     } catch (err: any) {
-      setErrorMsg(err.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อเครือข่าย');
+      const msg = err.message || '';
+      if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('CORS')) {
+        setErrorMsg('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต หรือติดต่อผู้ดูแลระบบ');
+      } else {
+        setErrorMsg(msg || 'เกิดข้อผิดพลาดในการเชื่อมต่อเครือข่าย');
+      }
     } finally {
       setLoading(false);
     }
@@ -86,7 +91,12 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onShowPublic }) =
         setErrorMsg(res.message || 'รหัส OTP ไม่ถูกต้องหรือหมดอายุ');
       }
     } catch (err: any) {
-      setErrorMsg(err.message || 'เกิดข้อผิดพลาดในการตรวจสอบรหัสผ่าน');
+      const msg = err.message || '';
+      if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('CORS')) {
+        setErrorMsg('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต หรือติดต่อผู้ดูแลระบบ');
+      } else {
+        setErrorMsg(msg || 'เกิดข้อผิดพลาดในการตรวจสอบรหัสผ่าน');
+      }
     } finally {
       setLoading(false);
     }

@@ -17,9 +17,18 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  server: {
+    proxy: {
+      '/api': {
+        target: 'https://script.google.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, '/macros/s/AKfycbwSosmXqRi1ByBBMo5h06JkIn0Zc1x4NI9at-btDns8obmcAHuNSCwTNFUwlgpNJqiczw'),
+      }
+    }
+  },
   plugins: [
     react(),
-    mode !== 'test' && VitePWA({
+    mode === 'production' && VitePWA({
       registerType: 'prompt',
       includeAssets: ['pwa_app_icon.png', 'icon-192.png', 'icon-512.png', 'vite.svg'],
       manifest: {

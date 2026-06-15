@@ -6,13 +6,14 @@ import { RunPage } from './pages/RunPage';
 import { SortPage } from './pages/SortPage';
 import { ExternalPage } from './pages/ExternalPage';
 import { ReportPage } from './pages/ReportPage';
-import { Loader2, Sun, Moon } from 'lucide-react';
-import { APP_NAME } from './config';
+import { Loader2, Sun, Moon, WifiOff } from 'lucide-react';
+import { APP_NAME, API_URL } from './config';
 import { LoginView } from './components/auth/LoginView';
 import { PublicTrackView } from './components/auth/PublicTrackView';
 import { getMasterData as getLocalMasterData, setMasterData as setLocalMasterData } from './lib/db';
 import { syncEngine } from './services/syncEngine';
 import { useRegisterSW } from 'virtual:pwa-register/react';
+import { FeedbackButton } from './components/common/FeedbackButton';
 
 const hasCompleteMasterData = (data: any) => (
   Array.isArray(data?.departments) &&
@@ -46,6 +47,8 @@ function App() {
 
   const [showPublicTrack, setShowPublicTrack] = useState(false);
   const [initialPublicDept, setInitialPublicDept] = useState('');
+  const [connectionStatus, setConnectionStatus] = useState<'checking' | 'connected' | 'failed'>('checking');
+  const [connectionError, setConnectionError] = useState('');
 
   // Sync theme mode with document HTML element
   useEffect(() => {
@@ -57,6 +60,24 @@ function App() {
   }, [theme]);
 
   useEffect(() => {
+    // Check connection on startup
+    const checkConnection = async () => {
+      try {
+        const connected = await api.checkConnection();
+        if (connected) {
+          setConnectionStatus('connected');
+          setConnectionError('');
+        } else {
+          setConnectionStatus('failed');
+          setConnectionError('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต');
+        }
+      } catch (err: any) {
+        setConnectionStatus('failed');
+        setConnectionError(err.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อ');
+      }
+    };
+    checkConnection();
+
     fetchMetaData();
     
     // Check URL parameters for direct public view linking
@@ -238,6 +259,37 @@ function App() {
           {sysConfig.appSubtitle || 'ระบบบันทึกข้อมูลการให้บริการงานไปรษณีย์ ส่วนอำนวยการสารบรรณ'}
         </p>
 
+        {/* Connection Diagnostic */}
+        {connectionStatus === 'checking' && (
+          <div className="mb-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-2xl">
+            <div className="flex items-center justify-center gap-2 text-blue-300 text-xs">
+              <Loader2 className="animate-spin w-4 h-4" />
+              <span>กำลังตรวจสอบการเชื่อมต่อ...</span>
+            </div>
+          </div>
+        )}
+
+        {connectionStatus === 'failed' && (
+          <div className="mb-6 p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-left">
+            <div className="flex items-center gap-2 text-rose-300 text-xs font-bold mb-2">
+              <WifiOff size={14} />
+              <span>ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้</span>
+            </div>
+            <p className="text-rose-200/70 text-[10px] mb-3">{connectionError}</p>
+            <div className="bg-slate-950/40 rounded-xl p-3 text-[9px] text-slate-400 space-y-1">
+              <p><span className="text-slate-500">API URL:</span> {API_URL.substring(0, 60)}...</p>
+              <p><span className="text-slate-500">สถานะ:</span> CORS หรือ Network Error</p>
+              <p className="text-slate-500 mt-2">ตรวจสอบว่า Google Apps Script Backend ถูก Deploy แล้วหรือยัง</p>
+            </div>
+            <button 
+              onClick={() => window.location.reload()}
+              className="mt-3 w-full py-2 bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/30 text-rose-200 text-[10px] font-bold rounded-xl transition-all"
+            >
+              ลองใหม่
+            </button>
+          </div>
+        )}
+
         <LoginView 
           onLogin={handleLogin} 
           onShowPublic={() => setShowPublicTrack(true)} 
@@ -266,6 +318,9 @@ function App() {
           </div>
         )}
       </MainLayout>
+
+      {/* Feedback Floating Button — visible only when logged in */}
+      <FeedbackButton />
 
       {/* PWA Update Banner */}
       {needRefresh && (
