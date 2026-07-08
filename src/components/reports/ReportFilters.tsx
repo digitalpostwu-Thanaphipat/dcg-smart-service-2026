@@ -3,6 +3,7 @@ import { useAppStore } from '../../store/useAppStore';
 import { GlassCard } from '../shared/GlassCard';
 import { cn } from '../../lib/utils';
 import { Calendar } from 'lucide-react';
+import { SearchMode } from '../../types';
 
 /**
  * ตัวกรองช่วงเวลาสำหรับหน้ารายงาน
@@ -91,6 +92,29 @@ export const ReportFilters: React.FC = () => {
             ปีงบประมาณ: 1 ตุลาคม — 30 กันยายน (ตามปฏิทินงบราชการไทย)
           </p>
         )}
+
+        {/* Search Mode - Opt-in only */}
+        <div className="pt-2 border-t border-slate-200 dark:border-white/5">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-widest">
+              โหมดค้นหา
+            </span>
+          </div>
+          <select
+            id="search-mode"
+            value={filters.searchMode}
+            onChange={(e) => setFilters({ searchMode: e.target.value as SearchMode })}
+            className="w-full bg-slate-100 dark:bg-slate-900/50 border border-slate-200 dark:border-white/5 rounded-lg px-3 py-2 text-xs text-slate-800 dark:text-white outline-none focus:ring-1 focus:ring-purple-500 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-purple-500 dark:focus-visible:ring-orange-500 focus-visible:outline-none transition-shadow"
+          >
+            <option value="department">ค้นหาตามหน่วยงาน (เดิม)</option>
+            <option value="budget_owner">ค้นหาตามต้นสังกัดงบประมาณ</option>
+          </select>
+          <p className="text-[9px] text-slate-500 dark:text-slate-500 mt-1">
+            {filters.searchMode === 'budget_owner'
+              ? 'จะแสดงธุรกรรมของหน่วยงานย่อยทั้งหมดที่อยู่ในสังกัดเดียวกัน'
+              : 'ค้นหาจากชื่อหน่วยงานโดยตรง (พฤติกรรมเดิม)'}
+          </p>
+        </div>
       </div>
     </GlassCard>
   );

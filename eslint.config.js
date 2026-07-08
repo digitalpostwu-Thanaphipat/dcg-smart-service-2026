@@ -5,7 +5,7 @@ import reactRefresh from 'eslint-plugin-react-refresh';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['dist', '.agent', '.agents', '.gemini', 'node_modules', 'scratch', 'คู่มือการใช้งานระบบบริหารงานไปรษณีย์'] },
+  { ignores: ['dist', 'coverage', '.agent', '.agents', '.gemini', 'node_modules', 'scratch', 'คู่มือการใช้งานระบบบริหารงานไปรษณีย์'] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ['**/*.{ts,tsx}'],

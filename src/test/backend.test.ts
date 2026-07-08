@@ -60,6 +60,10 @@ function createMockedBackend(mocks: Record<string, any>) {
       verifyOTP,
       verifySelfServiceOTP,
       requestSelfServiceOTP,
+      hashToken,
+      verifySessionToken,
+      doPost,
+      deleteLog,
     };
   `;
   
@@ -158,6 +162,11 @@ describe('backend.gs - session expiry policy', () => {
       },
       Utilities: {
         getUuid: vi.fn(() => 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'),
+        computeDigest: vi.fn((algorithm, value) => {
+          // Simple mock hash for testing
+          return [0x53, 0x48, 0x41, 0x5f, 0x32, 0x35, 0x36]; // "SHA_256" in ASCII
+        }),
+        DigestAlgorithm: { SHA_256: 'SHA_256' },
       },
       console: { warn: vi.fn(), log: vi.fn(), error: vi.fn() },
     });
@@ -193,6 +202,10 @@ describe('backend.gs - session expiry policy', () => {
       },
       Utilities: {
         getUuid: vi.fn(() => 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff'),
+        computeDigest: vi.fn((algorithm, value) => {
+          return [0x53, 0x48, 0x41, 0x5f, 0x32, 0x35, 0x36];
+        }),
+        DigestAlgorithm: { SHA_256: 'SHA_256' },
       },
       console: { warn: vi.fn(), log: vi.fn(), error: vi.fn() },
     });
@@ -861,5 +874,366 @@ describe('backend.gs - Auto-Backup Engine (Milestone 3)', () => {
     expect(staleFileNewName.setTrashed).toHaveBeenCalledWith(true);
     expect(freshFile.setTrashed).not.toHaveBeenCalled();
     expect(unrelatedFile.setTrashed).not.toHaveBeenCalled();
+  });
+});
+
+describe('backend.gs - security: hashToken', () => {
+  it('hashToken should return consistent hex digest and use SHA_256', () => {
+    const computeDigestSpy = vi.fn((algorithm, value) => {
+      return [0xAB, 0xCD, 0xEF, 0x12, 0x34, 0x56, 0x78, 0x90];
+    });
+
+    const backend = createMockedBackend({
+      Utilities: {
+        computeDigest: computeDigestSpy,
+        DigestAlgorithm: { SHA_256: 'SHA_256' },
+      },
+      PropertiesService: {
+        getScriptProperties: vi.fn(() => ({
+          getProperty: vi.fn(() => null),
+        })),
+      },
+      SpreadsheetApp: {
+        getActiveSpreadsheet: vi.fn(() => ({
+          getSheetByName: vi.fn(() => null),
+        })),
+      },
+      console: { warn: vi.fn(), log: vi.fn(), error: vi.fn() },
+    });
+
+    const hash = backend.hashToken('test-token');
+    expect(hash).toBe('abcdef1234567890');
+    // Verify SHA_256 algorithm was used
+    expect(computeDigestSpy).toHaveBeenCalledWith('SHA_256', 'test-token');
+  });
+});
+
+describe('backend.gs - security: RBAC log-only', () => {
+  it('verifySessionToken should return role from Master_Users (non-admin)', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-10T10:00:00+07:00'));
+
+    const createSimpleSheet = (headers: string[], rows: any[][] = []) => ({
+      getDataRange: () => ({
+        getValues: () => [headers, ...rows],
+      }),
+      getSheetName: () => 'MockSheet',
+    });
+
+    // Staff user (non-admin) with valid session
+    const otpSheet = createSimpleSheet(
+      ['Email', 'OTPCode', 'OTPExpiresAt', 'SessionToken', 'SessionTokenHash', 'SessionExpiresAt', 'FailedAttempts', 'LastRequestedAt'],
+      [['staff@wu.ac.th', '', new Date(0), 'ST-TESTTOKEN', 'hash123', new Date('2026-06-12T16:59:59'), 0, new Date()]],
+    );
+    const usersSheet = createSimpleSheet(
+      ['UserID', 'Email', 'FullName', 'Role', 'Status'],
+      [['U001', 'staff@wu.ac.th', 'Staff User', 'Staff', 'Active']],
+    );
+
+    const spreadsheet = {
+      getSheetByName: vi.fn((name) => {
+        if (name === 'Tx_OTPStore') return otpSheet;
+        if (name === 'Master_Users') return usersSheet;
+        return null;
+      }),
+    };
+
+    const backend = createMockedBackend({
+      SpreadsheetApp: { flush: vi.fn(), openById: vi.fn(() => spreadsheet), getActiveSpreadsheet: vi.fn(() => spreadsheet) },
+      PropertiesService: {
+        getScriptProperties: vi.fn(() => ({
+          getProperty: vi.fn((key) => (key === 'SPREADSHEET_ID' ? 'mock-spreadsheet' : null)),
+        })),
+      },
+      Utilities: {
+        getUuid: vi.fn(() => 'test-uuid'),
+        computeDigest: vi.fn(() => [0x01, 0x02]),
+        DigestAlgorithm: { SHA_256: 'SHA_256' },
+      },
+      console: { warn: vi.fn(), log: vi.fn(), error: vi.fn() },
+    });
+
+    // verifySessionToken returns role
+    const result = backend.verifySessionToken('ST-TESTTOKEN');
+    expect(result.email).toBe('staff@wu.ac.th');
+    expect(result.role).toBe('Staff');
+
+    // RBAC check: non-admin role triggers warning in doPost
+    // (doPost requires full GAS event mock, tested via integration/manual)
+    // verifySessionToken correctly provides role for RBAC decision
+  });
+
+  it('verifySessionToken should return Admin role for admin user', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-10T10:00:00+07:00'));
+
+    const createSimpleSheet = (headers: string[], rows: any[][] = []) => ({
+      getDataRange: () => ({
+        getValues: () => [headers, ...rows],
+      }),
+      getSheetName: () => 'MockSheet',
+    });
+
+    // Admin user with valid session
+    const otpSheet = createSimpleSheet(
+      ['Email', 'OTPCode', 'OTPExpiresAt', 'SessionToken', 'SessionTokenHash', 'SessionExpiresAt', 'FailedAttempts', 'LastRequestedAt'],
+      [['admin@wu.ac.th', '', new Date(0), 'ST-ADMINTOKEN', 'hash456', new Date('2026-06-12T16:59:59'), 0, new Date()]],
+    );
+    const usersSheet = createSimpleSheet(
+      ['UserID', 'Email', 'FullName', 'Role', 'Status'],
+      [['U002', 'admin@wu.ac.th', 'Admin User', 'Admin', 'Active']],
+    );
+
+    const spreadsheet = {
+      getSheetByName: vi.fn((name) => {
+        if (name === 'Tx_OTPStore') return otpSheet;
+        if (name === 'Master_Users') return usersSheet;
+        return null;
+      }),
+    };
+
+    const backend = createMockedBackend({
+      SpreadsheetApp: { flush: vi.fn(), openById: vi.fn(() => spreadsheet), getActiveSpreadsheet: vi.fn(() => spreadsheet) },
+      PropertiesService: {
+        getScriptProperties: vi.fn(() => ({
+          getProperty: vi.fn((key) => (key === 'SPREADSHEET_ID' ? 'mock-spreadsheet' : null)),
+        })),
+      },
+      Utilities: {
+        getUuid: vi.fn(() => 'test-uuid'),
+        computeDigest: vi.fn(() => [0x01, 0x02]),
+        DigestAlgorithm: { SHA_256: 'SHA_256' },
+      },
+      console: { warn: vi.fn(), log: vi.fn(), error: vi.fn() },
+    });
+
+    // verifySessionToken returns Admin role
+    const result = backend.verifySessionToken('ST-ADMINTOKEN');
+    expect(result.email).toBe('admin@wu.ac.th');
+    expect(result.role).toBe('Admin');
+  });
+
+  it('verifySessionToken should normalize email when looking up role', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-10T10:00:00+07:00'));
+
+    const createSimpleSheet = (headers: string[], rows: any[][] = []) => ({
+      getDataRange: () => ({
+        getValues: () => [headers, ...rows],
+      }),
+      getSheetName: () => 'MockSheet',
+    });
+
+    // User with email that has spaces/case differences
+    const otpSheet = createSimpleSheet(
+      ['Email', 'OTPCode', 'OTPExpiresAt', 'SessionToken', 'SessionTokenHash', 'SessionExpiresAt', 'FailedAttempts', 'LastRequestedAt'],
+      [['  Staff@WU.AC.TH  ', '', new Date(0), 'ST-NORMTOKEN', 'hash789', new Date('2026-06-12T16:59:59'), 0, new Date()]],
+    );
+    const usersSheet = createSimpleSheet(
+      ['UserID', 'Email', 'FullName', 'Role', 'Status'],
+      [['U003', 'staff@wu.ac.th', 'Staff User', 'Staff', 'Active']],
+    );
+
+    const spreadsheet = {
+      getSheetByName: vi.fn((name) => {
+        if (name === 'Tx_OTPStore') return otpSheet;
+        if (name === 'Master_Users') return usersSheet;
+        return null;
+      }),
+    };
+
+    const backend = createMockedBackend({
+      SpreadsheetApp: { flush: vi.fn(), openById: vi.fn(() => spreadsheet), getActiveSpreadsheet: vi.fn(() => spreadsheet) },
+      PropertiesService: {
+        getScriptProperties: vi.fn(() => ({
+          getProperty: vi.fn((key) => (key === 'SPREADSHEET_ID' ? 'mock-spreadsheet' : null)),
+        })),
+      },
+      Utilities: {
+        getUuid: vi.fn(() => 'test-uuid'),
+        computeDigest: vi.fn(() => [0x01, 0x02]),
+        DigestAlgorithm: { SHA_256: 'SHA_256' },
+      },
+      console: { warn: vi.fn(), log: vi.fn(), error: vi.fn() },
+    });
+
+    // Should still find role despite email case/space differences
+    const result = backend.verifySessionToken('ST-NORMTOKEN');
+    expect(result.email).toBe('  Staff@WU.AC.TH  ');
+    expect(result.role).toBe('Staff'); // Found via normalized email lookup
+  });
+});
+
+describe('backend.gs - security: mock token removal', () => {
+  it('verifySessionToken should reject mock-token-123', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-10T10:00:00+07:00'));
+
+    // Create minimal mock sheets
+    const createSimpleSheet = (headers: string[], rows: any[][] = []) => ({
+      getDataRange: () => ({
+        getValues: () => [headers, ...rows],
+      }),
+      getSheetName: () => 'MockSheet',
+    });
+
+    const otpSheet = createSimpleSheet(
+      ['Email', 'OTPCode', 'OTPExpiresAt', 'SessionToken', 'SessionTokenHash', 'SessionExpiresAt', 'FailedAttempts', 'LastRequestedAt'],
+      [],
+    );
+    const usersSheet = createSimpleSheet(
+      ['UserID', 'Email', 'FullName', 'Role', 'Status'],
+      [],
+    );
+
+    const spreadsheet = {
+      getSheetByName: vi.fn((name) => {
+        if (name === 'Tx_OTPStore') return otpSheet;
+        if (name === 'Master_Users') return usersSheet;
+        return null;
+      }),
+    };
+
+    const backend = createMockedBackend({
+      SpreadsheetApp: { flush: vi.fn(), openById: vi.fn(() => spreadsheet), getActiveSpreadsheet: vi.fn(() => spreadsheet) },
+      PropertiesService: {
+        getScriptProperties: vi.fn(() => ({
+          getProperty: vi.fn(() => null),
+        })),
+      },
+      Utilities: {
+        computeDigest: vi.fn(() => [0x01]),
+        DigestAlgorithm: { SHA_256: 'SHA_256' },
+      },
+      console: { warn: vi.fn(), log: vi.fn(), error: vi.fn() },
+    });
+
+    // mock-token-123 should be rejected (no bypass)
+    expect(() => backend.verifySessionToken('mock-token-123')).toThrow();
+  });
+});
+
+describe('backend.gs - deleteLog batch deletion', () => {
+  it('should delete single row and call deleteRows once', () => {
+    const deleteRowsSpy = vi.fn();
+    const deleteRowSpy = vi.fn();
+    const flushSpy = vi.fn();
+
+    const txSheet = {
+      getDataRange: () => ({
+        getValues: () => [
+          ['TxID', 'Timestamp', 'DeptName'],
+          ['TX-001', '2026-06-10 09:00:00', 'แผนกทดสอบ'],
+          ['TX-002', '2026-06-10 10:00:00', 'แผนกอื่น'],
+        ],
+      }),
+      deleteRows: deleteRowsSpy,
+      deleteRow: deleteRowSpy,
+    };
+
+    const spreadsheet = {
+      getSheetByName: vi.fn((name) => {
+        if (name === 'Tx_InternalRun') return txSheet;
+        return null;
+      }),
+    };
+
+    const backend = createMockedBackend({
+      SpreadsheetApp: { flush: flushSpy, openById: vi.fn(() => spreadsheet), getActiveSpreadsheet: vi.fn(() => spreadsheet) },
+      PropertiesService: {
+        getScriptProperties: vi.fn(() => ({
+          getProperty: vi.fn(() => null),
+        })),
+      },
+      LockService: { getScriptLock: vi.fn(() => ({ waitLock: vi.fn(), releaseLock: vi.fn() })), tryLock: vi.fn(() => true) },
+      console: { warn: vi.fn(), log: vi.fn(), error: vi.fn() },
+    });
+
+    const result = backend.deleteLog({ id: 'TX-001', type: 'run' });
+
+    expect(result.deletedCount).toBe(1);
+    expect(deleteRowsSpy).toHaveBeenCalledWith(2, 1); // row 2, count 1
+    expect(deleteRowSpy).not.toHaveBeenCalled(); // ไม่ควรใช้ deleteRow ทีละแถว
+  });
+
+  it('should delete multiple contiguous rows with single deleteRows call', () => {
+    const deleteRowsSpy = vi.fn();
+    const deleteRowSpy = vi.fn();
+
+    const txSheet = {
+      getDataRange: () => ({
+        getValues: () => [
+          ['TxID', 'Timestamp', 'DeptName'],
+          ['TX-001', '2026-06-10 09:00:00', 'แผนกทดสอบ'],
+          ['TX-001', '2026-06-10 10:00:00', 'แผนกทดสอบ'],
+          ['TX-001', '2026-06-10 11:00:00', 'แผนกทดสอบ'],
+          ['TX-002', '2026-06-10 12:00:00', 'แผนกอื่น'],
+        ],
+      }),
+      deleteRows: deleteRowsSpy,
+      deleteRow: deleteRowSpy,
+    };
+
+    const spreadsheet = {
+      getSheetByName: vi.fn((name) => {
+        if (name === 'Tx_InternalRun') return txSheet;
+        return null;
+      }),
+    };
+
+    const backend = createMockedBackend({
+      SpreadsheetApp: { flush: vi.fn(), openById: vi.fn(() => spreadsheet), getActiveSpreadsheet: vi.fn(() => spreadsheet) },
+      PropertiesService: {
+        getScriptProperties: vi.fn(() => ({
+          getProperty: vi.fn(() => null),
+        })),
+      },
+      LockService: { getScriptLock: vi.fn(() => ({ waitLock: vi.fn(), releaseLock: vi.fn() })), tryLock: vi.fn(() => true) },
+      console: { warn: vi.fn(), log: vi.fn(), error: vi.fn() },
+    });
+
+    const result = backend.deleteLog({ id: 'TX-001', type: 'run' });
+
+    expect(result.deletedCount).toBe(3);
+    expect(deleteRowsSpy).toHaveBeenCalledTimes(1); // เรียก deleteRows 1 ครั้ง
+    expect(deleteRowsSpy).toHaveBeenCalledWith(2, 3); // row 2, count 3
+    expect(deleteRowSpy).not.toHaveBeenCalled();
+  });
+
+  it('should return deletedCount 0 when id not found', () => {
+    const deleteRowsSpy = vi.fn();
+
+    const txSheet = {
+      getDataRange: () => ({
+        getValues: () => [
+          ['TxID', 'Timestamp', 'DeptName'],
+          ['TX-001', '2026-06-10 09:00:00', 'แผนกทดสอบ'],
+        ],
+      }),
+      deleteRows: deleteRowsSpy,
+    };
+
+    const spreadsheet = {
+      getSheetByName: vi.fn((name) => {
+        if (name === 'Tx_InternalRun') return txSheet;
+        return null;
+      }),
+    };
+
+    const backend = createMockedBackend({
+      SpreadsheetApp: { flush: vi.fn(), openById: vi.fn(() => spreadsheet), getActiveSpreadsheet: vi.fn(() => spreadsheet) },
+      PropertiesService: {
+        getScriptProperties: vi.fn(() => ({
+          getProperty: vi.fn(() => null),
+        })),
+      },
+      LockService: { getScriptLock: vi.fn(() => ({ waitLock: vi.fn(), releaseLock: vi.fn() })), tryLock: vi.fn(() => true) },
+      console: { warn: vi.fn(), log: vi.fn(), error: vi.fn() },
+    });
+
+    const result = backend.deleteLog({ id: 'TX-999', type: 'run' });
+
+    expect(result.deletedCount).toBe(0);
+    expect(deleteRowsSpy).not.toHaveBeenCalled();
   });
 });

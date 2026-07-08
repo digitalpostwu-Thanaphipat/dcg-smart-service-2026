@@ -13,7 +13,7 @@ var CRITICAL_SCHEMA_HEADERS = {
   Tx_InternalRun: ["TxID", "Timestamp", "DeptName", "Route", "Round", "ItemCount", "Note", "StaffEmail"],
   Tx_InternalSort: ["TxID", "Timestamp", "DeptName", "NormalCount", "RegisterCount", "PrivateCount", "Total", "Note", "StaffEmail"],
   Tx_ExternalPost: ["TxID", "Timestamp", "RequestingDept", "ServiceType", "Cost", "ItemCount", "TrackingNo", "FundSource", "StaffEmail"],
-  Tx_SelfServiceOTPStore: ["Email", "OTPCode", "OTPExpiresAt", "SessionToken", "SessionExpiresAt", "FailedAttempts", "LastRequestedAt"],
+  Tx_SelfServiceOTPStore: ["Email", "OTPCode", "OTPExpiresAt", "SessionToken", "SessionTokenHash", "SessionExpiresAt", "FailedAttempts", "LastRequestedAt"],
   Tx_SelfServiceLog: [
     "Timestamp",
     "Email",
@@ -99,6 +99,17 @@ function doPost(e) {
       action === "searchLogs"
     ) {
       staffSessionUser = verifySessionToken(auth.sessionToken);
+    }
+
+    // RBAC Check (Phase 1A: log-only, Phase 1B: enforce)
+    if (action === "deleteLog" || action === "archiveRollover") {
+      var userRole = staffSessionUser.role || "";
+      if (userRole !== "Admin") {
+        Logger.log("WARN: Non-admin user " + staffSessionUser.email + " attempted " + action + " (role: " + userRole + ")");
+        // Phase 1A: log-only - ยังไม่ block
+        // Phase 1B: uncomment บรรทัดล่างเพื่อ enforce
+        // throw new Error("ไม่มีสิทธิ์ดำเนินการ (Admin Only)");
+      }
     }
 
     if (action === "getHealth") {
@@ -251,15 +262,6 @@ function ensureMasterUsersHeadersSync(ss) {
 function verifySessionToken(sessionToken) {
   var today = new Date();
 
-  // บันทึกข้ามผ่านสำหรับการทดสอบบน localhost ด้วย Mock Token (เปิดใช้งานเฉพาะเมื่อตั้งค่า ALLOW_MOCK_TOKEN = "true" เท่านั้น)
-  if (sessionToken === "mock-token-123") {
-    var allowMock =
-      PropertiesService.getScriptProperties().getProperty("ALLOW_MOCK_TOKEN");
-    if (allowMock === "true") {
-      return { email: "mock@wu.ac.th", name: "Mock User" };
-    }
-  }
-
   if (!sessionToken || sessionToken === "") {
     throw new Error(
       "กรุณาเข้าสู่ระบบก่อนดำเนินการบันทึกหรือลบข้อมูล (Authentication Required)",
@@ -282,8 +284,9 @@ function verifySessionToken(sessionToken) {
   }
 
   var otpData = getSheetDataAsObjects(otpSheet);
+  var inputHash = hashToken(sessionToken);
   var sessionRecord = otpData.find(function (r) {
-    return r.SessionToken === sessionToken;
+    return r.SessionToken === sessionToken || r.SessionTokenHash === inputHash;
   });
 
   if (!sessionRecord) {
@@ -297,7 +300,33 @@ function verifySessionToken(sessionToken) {
     );
   }
 
-  return { email: sessionRecord.Email };
+  // ดึง role จาก Master_Users
+  var ss = getSpreadsheet();
+  var usersSheet = ss.getSheetByName("Master_Users");
+  var userRole = "";
+  if (usersSheet) {
+    var users = getSheetDataAsObjects(usersSheet);
+    var searchEmail = String(sessionRecord.Email).trim().toLowerCase();
+    var user = users.find(function (u) {
+      return String(u.Email).trim().toLowerCase() === searchEmail;
+    });
+    if (user) {
+      userRole = user.Role || "";
+    }
+  }
+
+  return { email: sessionRecord.Email, role: userRole };
+}
+
+// Hash token ด้วย SHA-256
+function hashToken(rawToken) {
+  var raw = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, rawToken);
+  var hex = "";
+  for (var i = 0; i < raw.length; i++) {
+    var byte = (raw[i] + 256) % 256;
+    hex += ("0" + byte.toString(16)).slice(-2);
+  }
+  return hex;
 }
 
 // เปิดสเปรดชีตอย่างปลอดภัย
@@ -351,6 +380,10 @@ function sanitizeInput(val) {
  * @param {Sheet} sheet - ออบเจกต์ชีตที่ต้องการดึงข้อมูล
  * @returns {Object[]} ข้อมูลตารางในรูปแบบอาเรย์ของออบเจกต์
  */
+function normalizeDeptName(name) {
+  return String(name || '').trim().toLowerCase();
+}
+
 function getSheetDataAsObjects(sheet) {
   if (!sheet) return [];
   var range = sheet.getDataRange();
@@ -846,11 +879,29 @@ function searchLogsCrossYear(payload, staffUser) {
   var filters = payload.filters || {};
   var startDateStr = filters.startDate ? formatYYYYMMDD(filters.startDate) : "";
   var endDateStr = filters.endDate ? formatYYYYMMDD(filters.endDate) : "";
-  var filterDept = filters.dept ? String(filters.dept).toLowerCase() : "";
+  var filterDept = filters.dept ? normalizeDeptName(filters.dept) : "";
+  var searchMode = filters.searchMode || "department";
   var readPlan = getReadSourcesForDateRange(startDateStr, endDateStr);
   var runResults = [];
   var sortResults = [];
   var extResults = [];
+
+  // ดึงรายการหน่วยงานย่อยสำหรับ budget_owner mode
+  var matchedDeptNames = [];
+  if (searchMode === "budget_owner" && filterDept) {
+    var ss0 = getSpreadsheet();
+    var deptSheet = ss0.getSheetByName("Master_Departments");
+    if (deptSheet) {
+      var depts = getSheetDataAsObjects(deptSheet);
+      depts.forEach(function (d) {
+        if (d.BudgetOwner && normalizeDeptName(d.BudgetOwner).indexOf(filterDept) !== -1) {
+          matchedDeptNames.push(d.DeptName);
+        }
+      });
+      // รวมหน่วยงานแม่ด้วย
+      matchedDeptNames.push(filterDept);
+    }
+  }
 
   readPlan.sources.forEach(function (source) {
     var ss = source.spreadsheet;
@@ -859,12 +910,24 @@ function searchLogsCrossYear(payload, staffUser) {
     if (runSheet) {
       runResults = runResults.concat(getSheetDataAsObjects(runSheet).filter(function (row) {
         if (!rowMatchesDateAndSource(row, startDateStr, endDateStr, source)) return false;
-        if (
-          filterDept &&
-          row.DeptName &&
-          String(row.DeptName).toLowerCase().indexOf(filterDept) === -1
-        ) {
-          return false;
+        if (filterDept) {
+          if (searchMode === "budget_owner") {
+            // budget_owner mode: กรองจาก matchedDeptNames
+            var rowDept = normalizeDeptName(row.DeptName);
+            var found = false;
+            for (var i = 0; i < matchedDeptNames.length; i++) {
+              if (normalizeDeptName(matchedDeptNames[i]) === rowDept) {
+                found = true;
+                break;
+              }
+            }
+            if (!found) return false;
+          } else {
+            // department mode: contains match (เดิม)
+            if (row.DeptName && String(row.DeptName).toLowerCase().indexOf(filterDept) === -1) {
+              return false;
+            }
+          }
         }
         return true;
       }).map(function (row) {
@@ -876,12 +939,22 @@ function searchLogsCrossYear(payload, staffUser) {
     if (sortSheet) {
       sortResults = sortResults.concat(getSheetDataAsObjects(sortSheet).filter(function (row) {
         if (!rowMatchesDateAndSource(row, startDateStr, endDateStr, source)) return false;
-        if (
-          filterDept &&
-          row.DeptName &&
-          String(row.DeptName).toLowerCase().indexOf(filterDept) === -1
-        ) {
-          return false;
+        if (filterDept) {
+          if (searchMode === "budget_owner") {
+            var rowDept = normalizeDeptName(row.DeptName);
+            var found = false;
+            for (var i = 0; i < matchedDeptNames.length; i++) {
+              if (normalizeDeptName(matchedDeptNames[i]) === rowDept) {
+                found = true;
+                break;
+              }
+            }
+            if (!found) return false;
+          } else {
+            if (row.DeptName && normalizeDeptName(row.DeptName).indexOf(filterDept) === -1) {
+              return false;
+            }
+          }
         }
         return true;
       }).map(function (row) {
@@ -893,12 +966,22 @@ function searchLogsCrossYear(payload, staffUser) {
     if (extSheet) {
       extResults = extResults.concat(getSheetDataAsObjects(extSheet).filter(function (row) {
         if (!rowMatchesDateAndSource(row, startDateStr, endDateStr, source)) return false;
-        if (
-          filterDept &&
-          row.RequestingDept &&
-          String(row.RequestingDept).toLowerCase().indexOf(filterDept) === -1
-        ) {
-          return false;
+        if (filterDept) {
+          if (searchMode === "budget_owner") {
+            var rowDept = normalizeDeptName(row.RequestingDept);
+            var found = false;
+            for (var i = 0; i < matchedDeptNames.length; i++) {
+              if (normalizeDeptName(matchedDeptNames[i]) === rowDept) {
+                found = true;
+                break;
+              }
+            }
+            if (!found) return false;
+          } else {
+            if (row.RequestingDept && normalizeDeptName(row.RequestingDept).indexOf(filterDept) === -1) {
+              return false;
+            }
+          }
         }
         return true;
       }).map(function (row) {
@@ -1458,14 +1541,42 @@ function deleteLog(payload) {
       throw new Error("ไม่พบคอลัมน์ TxID ในตารางประวัติธุรกรรม");
     }
 
-    var deletedCount = 0;
-    // ค้นหาย้อนกลับขึ้นไปด้านบนเพื่อไม่ให้ดัชนีแถวคลาดเคลื่อนในกรณีมีหลายแถวที่ตรงกัน
-    for (var r = values.length - 1; r >= 1; r--) {
+    // รวบรวมตำแหน่งแถวที่ต้องลบ
+    var rowsToDelete = [];
+    for (var r = 1; r < values.length; r++) {
       if (values[r][txIdColIdx] === id) {
-        sheet.deleteRow(r + 1); // spreadsheet row index เริ่มต้นที่ 1 และรวม header แถวที่ 1
-        deletedCount++;
+        rowsToDelete.push(r + 1); // spreadsheet row index เริ่มต้นที่ 1
       }
     }
+
+    if (rowsToDelete.length === 0) {
+      return { message: "ไม่พบรายการที่ต้องลบ", deletedCount: 0 };
+    }
+
+    // จัดกลุ่มเป็น ranges (สำหรับแถวติดกัน)
+    rowsToDelete.sort(function(a, b) { return a - b; });
+    var ranges = [];
+    var rangeStart = rowsToDelete[0];
+    var rangeEnd = rowsToDelete[0];
+
+    for (var i = 1; i < rowsToDelete.length; i++) {
+      if (rowsToDelete[i] === rangeEnd + 1) {
+        rangeEnd = rowsToDelete[i];
+      } else {
+        ranges.push({ start: rangeStart, end: rangeEnd });
+        rangeStart = rowsToDelete[i];
+        rangeEnd = rowsToDelete[i];
+      }
+    }
+    ranges.push({ start: rangeStart, end: rangeEnd });
+
+    // ลบจากล่างขึ้นบน (ป้องกัน index shift) ด้วย deleteRows()
+    var deletedCount = 0;
+    ranges.reverse().forEach(function(range) {
+      var rowCount = range.end - range.start + 1;
+      sheet.deleteRows(range.start, rowCount);
+      deletedCount += rowCount;
+    });
 
     SpreadsheetApp.flush();
     return {
@@ -2210,6 +2321,7 @@ function writeSessionRecord(
   var otpCodeIdx = headers.indexOf("OTPCode");
   var otpExpiresIdx = headers.indexOf("OTPExpiresAt");
   var tokenIdx = headers.indexOf("SessionToken");
+  var tokenHashIdx = headers.indexOf("SessionTokenHash");
   var tokenExpiresIdx = headers.indexOf("SessionExpiresAt");
 
   // ตรวจสอบและสร้างคอลัมน์ FailedAttempts สำหรับเก็บจำนวนครั้งที่เข้าระบบผิดพลาด (Self-healing Header)
@@ -2219,6 +2331,15 @@ function writeSessionRecord(
     sheet.getRange(1, failedAttemptsIdx + 1).setValue("FailedAttempts");
     headers.push("FailedAttempts");
   }
+
+  // ตรวจสอบและสร้างคอลัมน์ SessionTokenHash (Self-healing Header)
+  if (tokenHashIdx === -1) {
+    tokenHashIdx = headers.length;
+    sheet.getRange(1, tokenHashIdx + 1).setValue("SessionTokenHash");
+    headers.push("SessionTokenHash");
+  }
+
+  var tokenHash = sessionToken ? hashToken(sessionToken) : "";
 
   var foundRow = -1;
   var searchEmail = String(email).trim().toLowerCase();
@@ -2236,6 +2357,7 @@ function writeSessionRecord(
     newRow[otpCodeIdx] = otpCode;
     newRow[otpExpiresIdx] = otpExpires;
     newRow[tokenIdx] = sessionToken;
+    newRow[tokenHashIdx] = tokenHash;
     newRow[tokenExpiresIdx] = sessionExpires;
     newRow[failedAttemptsIdx] =
       failedAttempts !== undefined && failedAttempts !== null
@@ -2248,8 +2370,10 @@ function writeSessionRecord(
       sheet.getRange(foundRow, otpCodeIdx + 1).setValue(otpCode);
     if (otpExpires !== null)
       sheet.getRange(foundRow, otpExpiresIdx + 1).setValue(otpExpires);
-    if (sessionToken !== null)
+    if (sessionToken !== null) {
       sheet.getRange(foundRow, tokenIdx + 1).setValue(sessionToken);
+      sheet.getRange(foundRow, tokenHashIdx + 1).setValue(tokenHash);
+    }
     if (sessionExpires !== null)
       sheet.getRange(foundRow, tokenExpiresIdx + 1).setValue(sessionExpires);
     if (failedAttempts !== undefined && failedAttempts !== null) {

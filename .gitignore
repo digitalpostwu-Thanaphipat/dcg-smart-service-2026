@@ -5,6 +5,9 @@ node_modules/
 dist/
 dist_old/
 
+# Test coverage
+coverage/
+
 # IDE & Editor
 .vscode/
 .idea/

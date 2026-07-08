@@ -2,6 +2,9 @@ import { Department } from '../types';
 
 const normalizeText = (value: unknown) => String(value ?? '').trim();
 
+// Helper กลางสำหรับ normalize ชื่อหน่วยงาน — ใช้ซ้ำใน report/filter/search
+export const normalizeDeptName = (name: string) => name.trim().toLowerCase();
+
 export const getDeptLocationDisplay = (dept: Department) => {
     const building = normalizeText(dept.Building);
     const floor = normalizeText(dept.Floor);
@@ -21,7 +24,8 @@ export const getBudgetOwnerEffective = (dept: Department) => normalizeText(dept.
 
 export const getRealOwner = (deptName: string, departments?: Department[]) => {
     if (!departments) return deptName;
-    const dept = departments.find(d => d.DeptName === deptName);
+    const normalized = normalizeDeptName(deptName);
+    const dept = departments.find(d => normalizeDeptName(d.DeptName) === normalized);
     return dept ? getBudgetOwnerEffective(dept) : deptName;
 };
 
@@ -35,14 +39,26 @@ export const departmentMatchesSearch = (dept: Department, query: string) => {
         dept.Floor,
         `ชั้น ${normalizeText(dept.Floor)}`,
         getBudgetOwnerEffective(dept),
-    ].some(value => normalizeText(value).toLowerCase().includes(q));
+    ].some(value => normalizeDeptName(String(value ?? '')).includes(q));
 };
 
-const formatLocalDate = (date: Date) => {
+export const formatLocalDate = (date: Date) => {
     const y = date.getFullYear();
     const m = String(date.getMonth() + 1).padStart(2, '0');
     const d = String(date.getDate()).padStart(2, '0');
     return `${y}-${m}-${d}`;
+};
+
+// Format datetime ใน local time สำหรับ syncEngine และ ReportPage
+// ใช้แทน toISOString() เพื่อให้ timestamp สอดคล้องกับ date filter
+export const formatLocalDateTime = (date: Date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    const h = String(date.getHours()).padStart(2, '0');
+    const min = String(date.getMinutes()).padStart(2, '0');
+    const s = String(date.getSeconds()).padStart(2, '0');
+    return `${y}-${m}-${d} ${h}:${min}:${s}`;
 };
 
 export const getDateRange = (
