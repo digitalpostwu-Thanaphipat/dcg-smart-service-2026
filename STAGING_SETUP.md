@@ -2,7 +2,7 @@
 
 ## ข้อควรระวัง
 - **ห้ามแก้ `.clasp.json` ตรง** ให้ใช้ script นี้สลับชั่วคราวเท่านั้น
-- **ห้าม push `.clasp.json` ที่ชี้ staging** ไป production
+- **ห้าม push `.clasp.json` ที่ชี้ staging** ไประบบจริง
 
 ---
 
@@ -12,7 +12,7 @@
 1. ไปที่ https://sheets.google.com
 2. กด **Blank** เพื่อสร้าง spreadsheet ใหม่
 3. ตั้งชื่อ: `DCG Smart Service Database (Staging)`
-4. คัดลอกโครงสร้างจาก sheet production:
+4. คัดลอกโครงสร้างจาก sheet ระบบจริง:
    - Master_Users
    - Master_Departments
    - Master_Services

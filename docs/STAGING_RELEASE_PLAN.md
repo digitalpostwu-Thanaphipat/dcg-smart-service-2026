@@ -1,19 +1,19 @@
 # แผน Staging/Testing และคู่มือปล่อยระบบ สำหรับ DCG Smart Service
 
 ## ภาพรวม
-สร้าง release runbook เป็นเอกสารหลักของโปรเจกต์ก่อนเริ่ม staging/testing เพื่อให้ทุกครั้งที่ปล่อยระบบมี checklist เดียวกัน ใช้ลดความเสี่ยงกับผู้ใช้จริง และบังคับผ่าน local, staging, schema, rollback และ smoke test ก่อน production
+สร้างคู่มือปล่อยระบบเป็นเอกสารหลักของโปรเจกต์ก่อนเริ่ม staging/testing เพื่อให้ทุกครั้งที่ปล่อยระบบมีรายการตรวจสอบเดียวกัน ใช้ลดความเสี่ยงกับผู้ใช้จริง และบังคับผ่านเครื่องทดสอบในเครื่อง, staging, schema, ย้อนกลับเวอร์ชัน และทดสอบเบื้องต้น ก่อนปล่อยระบบจริง
 
 ---
 
 ## ขั้นที่ 0: สร้างคู่มือการปล่อยระบบ
 - ไฟล์นี้ `docs/STAGING_RELEASE_PLAN.md` เป็นเอกสารหลักของโปรเจกต์
-- เนื้อหาเป็น checklist ทำตามได้ทีละขั้น ไม่ใช่แค่บทสรุป
+- เนื้อหาเป็นรายการตรวจสอบ ทำตามได้ทีละขั้น ไม่ใช่แค่บทสรุป
 - Phase 3.5 Split Backend ยังไม่ทำในรอบนี้
 - นโยบายสำคัญ:
-  - ห้าม deploy production ถ้า local/staging ยังไม่เขียว
+  - ห้ามปล่อยระบบจริงถ้าเครื่องทดสอบในเครื่อง/staging ยังไม่เขียว
   - Playwright mock ต้องใช้ network layer
-  - ห้ามเปิด mock token ใน production
-  - ต้องมี rollback version ก่อน production
+  - ห้ามเปิด mock token ในระบบจริง
+  - ต้องมีเวอร์ชันย้อนกลับก่อนปล่อยระบบจริง
   - ต้องตรวจ schema `SessionTokenHash` ก่อนเปิดใช้งานจริง
 
 ---
@@ -25,17 +25,17 @@
 npm test                    # ต้องผ่านทั้งหมด
 npm run lint                # ต้องไม่มี error
 npx tsc --noEmit            # TypeScript ต้องผ่าน
-npm run build               # Production build ต้องสำเร็จ
-npm run test:coverage       # Coverage report-only ยังไม่ enforce threshold
+npm run build               # การสร้างไฟล์สำหรับระบบจริงต้องสำเร็จ
+npm run test:coverage       # รายงาน Coverage ยังไม่ enforce threshold
 ```
 
 ### A2. ทดสอบ localhost ด้วยมือ
 - [ ] login/mock flow ต้องใช้ network mock เท่านั้น
 - [ ] บันทึกงาน (run/sort/ext)
 - [ ] รายงาน 1 เดือน/3 เดือน ต้องยอดตรงกัน
-- [ ] department search เดิม (default)
-- [ ] budget_owner search ใหม่
-- [ ] export/delete ใช้ข้อมูลเต็ม ไม่ใช่เฉพาะ virtualized rows
+- [ ] ค้นหาแบบ department เดิม (default)
+- [ ] ค้นหาแบบ budget_owner ใหม่
+- [ ] ส่งออก/ลบ ใช้ข้อมูลเต็ม ไม่ใช่เฉพาะ virtualized rows
 - [ ] virtualized list scroll แล้วไม่เลื่อน/ซ้อนกัน
 
 ---
@@ -43,7 +43,7 @@ npm run test:coverage       # Coverage report-only ยังไม่ enforce th
 ## ขั้นที่ B: Staging Backend
 
 ### B1. ตั้งค่า Staging
-- [ ] สร้าง Google Sheets staging แยกจาก production
+- [ ] สร้าง Google Sheets staging แยกจากระบบจริง
 - [ ] ตั้งค่า Apps Script staging ชี้ staging sheet เท่านั้น
 - [ ] `clasp push` ไป staging project/deployment
 
@@ -63,12 +63,12 @@ npm run test:coverage       # Coverage report-only ยังไม่ enforce th
 
 ## ขั้นที่ C: Frontend Staging
 
-### C1. Deploy
-- [ ] Deploy frontend preview/staging โดยชี้ API ไป staging backend
+### C1. ปล่อยระบบ
+- [ ] ปล่อย frontend preview/staging โดยชี้ API ไป staging backend
 - [ ] ห้ามแก้ URL มือในโค้ด ใช้ env/config เท่านั้น
 
 ### C2. ทดสอบ Full Flow
-- [ ] login → บันทึก → sync → รายงาน → export
+- [ ] login → บันทึก → sync → รายงาน → ส่งออก
 - [ ] pending/offline logs ทั้ง timestamp เก่าและใหม่
 - [ ] sidebar/progress วันนี้
 - [ ] virtualized list ตอน scroll
@@ -97,37 +97,37 @@ npm run test:e2e
 
 ## ขั้นที่ E: ตรวจสอบก่อนปล่อยระบบจริง
 
-### E1. ตรวจสอบ GAS Rollback
-- [ ] บันทึก `Deployment ID` ปัจจุบันของ production
-- [ ] บันทึก `Version` ปัจจุบันของ production
-- [ ] สร้าง candidate version ใหม่ก่อน deploy
-- [ ] เตรียม rollback ผ่าน Apps Script Manage Deployments
+### E1. ตรวจสอบการย้อนกลับ GAS
+- [ ] บันทึก `Deployment ID` ปัจจุบันของระบบจริง
+- [ ] บันทึก `Version` ปัจจุบันของระบบจริง
+- [ ] สร้าง candidate version ใหม่ก่อนปล่อยระบบ
+- [ ] เตรียมย้อนกลับผ่าน Apps Script Manage Deployments
 
 ### E2. ตรวจสอบ Schema Migration
-- [ ] backup หรือยืนยัน production sheet ก่อนแก้ schema
+- [ ] backup หรือยืนยัน sheet ระบบจริงก่อนแก้ schema
 - [ ] ตรวจ `Tx_OTPStore.SessionTokenHash`
 - [ ] ตรวจ `Tx_SelfServiceOTPStore.SessionTokenHash` ถ้าใช้งานจริง
 - [ ] ถ้า column ยังไม่มี ให้เพิ่มผ่าน schema audit/repair ก่อนเปิดใช้งาน
 
 ### E3. ตรวจสอบความปลอดภัย
-- [ ] production ไม่มี `ALLOW_MOCK_TOKEN=true`
+- [ ] ระบบจริงไม่มี `ALLOW_MOCK_TOKEN=true`
 - [ ] backend reject `mock-token-123`
 - [ ] ปุ่ม Mock Login ไม่แสดงนอก localhost
 
 ### E4. ตรวจสอบการเปิดใช้งาน
-- [ ] เลือกช่วง deploy ที่กระทบผู้ใช้น้อย
-- [ ] เตรียมบัญชี Admin สำหรับ smoke test
-- [ ] เตรียม rollback owner และขั้นตอนตัดสินใจ
+- [ ] เลือกช่วงปล่อยระบบที่กระทบผู้ใช้น้อย
+- [ ] เตรียมบัญชี Admin สำหรับทดสอบเบื้องต้น
+- [ ] เตรียมเจ้าของงานย้อนกลับและขั้นตอนตัดสินใจ
 
 ---
 
 ## ขั้นที่ F: ปล่อยระบบจริง
 
-### F1. Deploy
-- [ ] Deploy GAS production เป็น version ใหม่
-- [ ] Deploy frontend production หลัง backend พร้อม
+### F1. ปล่อยระบบ
+- [ ] ปล่อย GAS ระบบจริงเป็น version ใหม่
+- [ ] ปล่อย frontend ระบบจริง หลัง backend พร้อม
 
-### F2. Production Smoke Test
+### F2. ทดสอบเบื้องต้นระบบจริง
 - [ ] login จริง
 - [ ] บันทึก/ตรวจรายการทดสอบ
 - [ ] เปิดรายงานวันนี้/เดือนนี้
@@ -136,13 +136,13 @@ npm run test:e2e
 - [ ] ตรวจ delete/admin flow
 
 ### F3. ย้อนกลับเวอร์ชันถ้าล้มเหลวรุนแรง
-- [ ] rollback GAS ไป version เดิม
-- [ ] rollback frontend ไป previous deployment
+- [ ] ย้อนกลับ GAS ไป version เดิม
+- [ ] ย้อนกลับ frontend ไป deployment ก่อนหน้า
 - [ ] หยุด token cleanup/migration เพิ่มเติม
 
 ---
 
-## การติดตามหลัง Deploy
+## การติดตามหลังปล่อยระบบ
 
 ### 7 วันแรก
 - [ ] เฝ้าดู RBAC log-only
@@ -155,14 +155,14 @@ npm run test:e2e
 
 ### Phase 3.5 Split Backend
 - [ ] ทำหลังรอบนี้นิ่งแล้ว
-- [ ] ต้องทดสอบบน staging isolation ก่อน production
+- [ ] ต้องทดสอบบน staging isolation ก่อนระบบจริง
 
 ---
 
 ## ข้อสันนิษฐาน
-- ยังไม่ deploy production จนกว่า checklist ผ่านครบ
+- ยังไม่ปล่อยระบบจริงจนกว่ารายการตรวจสอบผ่านครบ
 - Coverage ยังเป็น report-only ไม่ enforce threshold
-- Staging ใช้ Google Sheets และ Apps Script แยกจาก production
+- Staging ใช้ Google Sheets และ Apps Script แยกจากระบบจริง
 - Phase 3.5 Split Backend แยกเป็นรอบถัดไป
 
 ---
@@ -172,6 +172,6 @@ npm run test:e2e
 | สถานการณ์ | วิธีแก้ |
 |-----------|--------|
 | ปัญหาหลังบ้าน | Redeploy Apps Script version ก่อนหน้า ผ่าน Manage Deployments |
-| ปัญหาหน้าบ้าน | Revert PR ใน GitHub หรือ rollback Vercel deployment |
+| ปัญหาหน้าบ้าน | Revert PR ใน GitHub หรือย้อนกลับ Vercel deployment |
 | ปัญหาข้อมูล | ตรวจสอบ Google Sheets โดยตรง |
 | ปัญหา schema | ย้อนกลับ schema ด้วย schema audit/repair |
