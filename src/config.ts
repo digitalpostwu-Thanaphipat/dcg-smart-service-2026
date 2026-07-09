@@ -17,8 +17,8 @@ if (isDev) {
 } else if (appEnv === 'staging') {
   // Staging without API URL: fail fast to prevent silent production fallback
   throw new Error(
-    '[DCG Smart Service] FATAL: VITE_API_URL is required in staging mode. ' +
-    'Set it in Vercel Preview environment variables or .env.staging file.'
+    '[DCG Smart Service] ข้อผิดพลาดร้ายแรง: ต้องตั้งค่า VITE_API_URL ในโหมด staging ' +
+    'กรุณาตั้งค่าใน Vercel Preview environment variables หรือไฟล์ .env.staging'
   );
 } else {
   // Production fallback

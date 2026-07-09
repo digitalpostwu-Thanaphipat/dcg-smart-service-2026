@@ -1,15 +1,15 @@
 # แผน Staging/Testing และ Production Release Runbook สำหรับ DCG Smart Service
 
-## Summary
+## ภาพรวม
 สร้าง release runbook เป็นเอกสารหลักของโปรเจกต์ก่อนเริ่ม staging/testing เพื่อให้ทุกครั้งที่ปล่อยระบบมี checklist เดียวกัน ใช้ลดความเสี่ยงกับผู้ใช้จริง และบังคับผ่าน local, staging, schema, rollback และ smoke test ก่อน production
 
 ---
 
-## Step 0: Create Deployment Runbook
+## ขั้นที่ 0: สร้าง Deployment Runbook
 - ไฟล์นี้ `docs/STAGING_RELEASE_PLAN.md` เป็นเอกสารหลักของโปรเจกต์
 - เนื้อหาเป็น checklist ทำตามได้ทีละขั้น ไม่ใช่แค่บทสรุป
 - Phase 3.5 Split Backend ยังไม่ทำในรอบนี้
-- Policy สำคัญ:
+- นโยบายสำคัญ:
   - ห้าม deploy production ถ้า local/staging ยังไม่เขียว
   - Playwright mock ต้องใช้ network layer
   - ห้ามเปิด mock token ใน production
@@ -18,7 +18,7 @@
 
 ---
 
-## Phase A: Local Verification
+## ขั้นที่ A: ตรวจสอบ Local
 
 ### A1. รันและบันทึกผล
 ```bash
@@ -40,7 +40,7 @@ npm run test:coverage       # Coverage report-only ยังไม่ enforce th
 
 ---
 
-## Phase B: Staging Backend
+## ขั้นที่ B: Staging Backend
 
 ### B1. ตั้งค่า Staging
 - [ ] สร้าง Google Sheets staging แยกจาก production
@@ -51,17 +51,17 @@ npm run test:coverage       # Coverage report-only ยังไม่ enforce th
 - [ ] `Tx_OTPStore` มีคอลัมน์ `SessionTokenHash`
 - [ ] `Tx_SelfServiceOTPStore` มี `SessionTokenHash` ถ้า self-service ใช้งานจริง
 
-### B3. Smoke Test Backend
+### B3. ทดสอบ Backend (Smoke Test)
 - [ ] request OTP → verify OTP → login
-- [ ] save transaction (run/sort/ext)
-- [ ] search report แบบ department
-- [ ] search report แบบ budget_owner
-- [ ] deleteLog
+- [ ] บันทึกธุรกรรม (run/sort/ext)
+- [ ] ค้นหารายงานแบบ department
+- [ ] ค้นหารายงานแบบ budget_owner
+- [ ] ลบรายการ (deleteLog)
 - [ ] archive/rollover เฉพาะ Admin หรือตรวจ log-only warning
 
 ---
 
-## Phase C: Frontend Staging
+## ขั้นที่ C: Frontend Staging
 
 ### C1. Deploy
 - [ ] Deploy frontend preview/staging โดยชี้ API ไป staging backend
@@ -76,7 +76,7 @@ npm run test:coverage       # Coverage report-only ยังไม่ enforce th
 
 ---
 
-## Phase D: E2E Testing
+## ขั้นที่ D: E2E Testing
 
 ### D1. รัน E2E
 ```bash
@@ -85,43 +85,43 @@ npm run test:e2e
 
 ### D2. ตรวจสอบ Mock Flow
 - [ ] Mock ต้อง intercept ด้วย `page.route()` เท่านั้น ไม่พึ่ง `mock-token-123`
-- [ ] login success/fail
-- [ ] create transaction
-- [ ] report range 1 เดือน/3 เดือน
-- [ ] department search
-- [ ] budget_owner search
-- [ ] delete flow
-- [ ] export flow ถ้ามี fixture
+- [ ] login สำเร็จ/ล้มเหลว
+- [ ] สร้างธุรกรรม
+- [ ] รายงานช่วง 1 เดือน/3 เดือน
+- [ ] ค้นหาแบบ department
+- [ ] ค้นหาแบบ budget_owner
+- [ ] ลบรายการ
+- [ ] ส่งออกรายงานถ้ามี fixture
 
 ---
 
-## Phase E: Pre-Production Gate
+## ขั้นที่ E: ตรวจสอบก่อน Production
 
-### E1. GAS Rollback Gate
-- [ ] บันทึก current production `Deployment ID`
-- [ ] บันทึก current production `Version`
+### E1. ตรวจสอบ GAS Rollback
+- [ ] บันทึก `Deployment ID` ปัจจุบันของ production
+- [ ] บันทึก `Version` ปัจจุบันของ production
 - [ ] สร้าง candidate version ใหม่ก่อน deploy
 - [ ] เตรียม rollback ผ่าน Apps Script Manage Deployments
 
-### E2. Schema Migration Gate
+### E2. ตรวจสอบ Schema Migration
 - [ ] backup หรือยืนยัน production sheet ก่อนแก้ schema
 - [ ] ตรวจ `Tx_OTPStore.SessionTokenHash`
 - [ ] ตรวจ `Tx_SelfServiceOTPStore.SessionTokenHash` ถ้าใช้งานจริง
 - [ ] ถ้า column ยังไม่มี ให้เพิ่มผ่าน schema audit/repair ก่อนเปิดใช้งาน
 
-### E3. Security Gate
+### E3. ตรวจสอบความปลอดภัย
 - [ ] production ไม่มี `ALLOW_MOCK_TOKEN=true`
 - [ ] backend reject `mock-token-123`
-- [ ] Mock Login button ไม่แสดงนอก localhost
+- [ ] ปุ่ม Mock Login ไม่แสดงนอก localhost
 
-### E4. Rollout Gate
+### E4. ตรวจสอบการเปิดใช้งาน
 - [ ] เลือกช่วง deploy ที่กระทบผู้ใช้น้อย
 - [ ] เตรียมบัญชี Admin สำหรับ smoke test
 - [ ] เตรียม rollback owner และขั้นตอนตัดสินใจ
 
 ---
 
-## Phase F: Production Deploy
+## ขั้นที่ F: Production Deploy
 
 ### F1. Deploy
 - [ ] Deploy GAS production เป็น version ใหม่
@@ -142,7 +142,7 @@ npm run test:e2e
 
 ---
 
-## Post-Deploy Follow-Up
+## การติดตามหลัง Deploy
 
 ### 7 วันแรก
 - [ ] เฝ้าดู RBAC log-only
@@ -159,7 +159,7 @@ npm run test:e2e
 
 ---
 
-## Assumptions
+## ข้อสันนิษฐาน
 - ยังไม่ deploy production จนกว่า checklist ผ่านครบ
 - Coverage ยังเป็น report-only ไม่ enforce threshold
 - Staging ใช้ Google Sheets และ Apps Script แยกจาก production
@@ -167,7 +167,7 @@ npm run test:e2e
 
 ---
 
-## Rollback Notes
+## บันทึก Rollback
 
 | สถานการณ์ | วิธีแก้ |
 |-----------|--------|

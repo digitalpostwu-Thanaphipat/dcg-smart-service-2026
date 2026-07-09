@@ -1,4 +1,4 @@
-# DCG Smart Service - Staging Setup Guide
+# คู่มือตั้งค่า Staging - DCG Smart Service
 
 ## ข้อควรระวัง
 - **ห้ามแก้ `.clasp.json` ตรง** ให้ใช้ script นี้สลับชั่วคราวเท่านั้น
@@ -8,7 +8,7 @@
 
 ## วิธีตั้งค่า Staging (ทีละขั้น)
 
-### Step 1: สร้าง Google Sheets Staging
+### ขั้นที่ 1: สร้าง Google Sheets Staging
 1. ไปที่ https://sheets.google.com
 2. กด **Blank** เพื่อสร้าง spreadsheet ใหม่
 3. ตั้งชื่อ: `DCG Smart Service Database (Staging)`
@@ -25,7 +25,7 @@
    - Feedback_Reports
 5. คัดลอก ID จาก URL: `https://docs.google.com/spreadsheets/d/[SPREADSHEET_ID]/edit`
 
-### Step 2: สร้าง Apps Script Staging
+### ขั้นที่ 2: สร้าง Apps Script Staging
 1. เปิด Google Sheets staging ที่สร้างไว้
 2. ไปที่ **Extensions > Apps Script**
 3. ลบ code เดิมออก
@@ -33,15 +33,15 @@
 5. ไปที่ **Project Settings** (ไอคอนฟันเฟือง)
 6. เพิ่ม **Script Properties**:
 
-| Property Name | Value |
-|---------------|-------|
+| ชื่อ Property | ค่า |
+|---------------|-----|
 | `SPREADSHEET_ID` | [ID ของ staging sheet] |
 | `LINE_NOTIFY_TOKEN` | [token ทดสอบ หรือ ปล่อยว่าง] |
 | `ALLOW_MOCK_TOKEN` | `false` |
 
 7. กด **Save**
 
-### Step 3: Deploy Staging Web App
+### ขั้นที่ 3: Deploy Staging Web App
 1. กด **Deploy > New deployment**
 2. เลือก **Web app**
 3. ตั้งค่า:
@@ -52,7 +52,7 @@
 5. คัดลอก **Web App URL** (จะลงท้ายด้วย `/exec`)
 6. คัดลอก **Script ID** จาก URL ของ Apps Script editor
 
-### Step 4: ตั้งค่า clasp.json สำหรับ Staging
+### ขั้นที่ 4: ตั้งค่า clasp.json สำหรับ Staging
 ```bash
 # วิธีที่ 1: ใช้ script อัตโนมัติ
 ./scripts/switch-clasp.sh staging
@@ -63,25 +63,25 @@ cp .clasp.staging.json .clasp.json
 # แก้ "scriptId" ใน .clasp.json เป็น staging script ID
 ```
 
-### Step 5: Push ไป Staging Apps Script
+### ขั้นที่ 5: Push ไป Staging Apps Script
 ```bash
 clasp push
 ```
 
-### Step 6: ตั้งค่า Vercel Preview Environment
+### ขั้นที่ 6: ตั้งค่า Vercel Preview Environment
 1. ไปที่ Vercel Dashboard > Project > Settings > Environment Variables
 2. เพิ่ม Variable:
    - Key: `VITE_API_URL`
    - Value: [Staging Web App URL ที่คัดลอกไว้]
    - Environment: **Preview** (เลือกเฉพาะ Preview)
 
-### Step 7: Deploy Preview
+### ขั้นที่ 7: Deploy Preview
 ```bash
 git push origin phase-1-3-staging-verification
 ```
 Vercel จะสร้าง Preview deployment โดยอัตโนมัติ
 
-### Step 8: Smoke Test
+### ขั้นที่ 8: ทดสอบระบบ
 1. เปิด Preview URL
 2. ทดสอบ login
 3. ทดสอบบันทึกข้อมูล
@@ -101,7 +101,7 @@ cp .clasp.production.json .clasp.json
 
 ---
 
-## Checklist Phase B
+## รายการตรวจสอบ Phase B
 - [ ] สร้าง Google Sheets staging
 - [ ] สร้าง Apps Script staging
 - [ ] ตั้งค่า Script Properties
@@ -109,5 +109,5 @@ cp .clasp.production.json .clasp.json
 - [ ] คัดลอก staging script ID ไปใส่ `.clasp.staging.json`
 - [ ] ตั้งค่า Vercel Preview env `VITE_API_URL`
 - [ ] Push code ไป branch staging
-- [ ] Smoke test บน Preview URL
+- [ ] ทดสอบระบบบน Preview URL
 - [ ] ตรวจสอบข้อมูลใน staging sheet
