@@ -41,7 +41,8 @@ npm-debug.log*
 
 # Scratch / temporary files
 scratch/
-scripts/
+scripts/*
+!scripts/switch-clasp.sh
 
 # Notes (personal — not project docs)
 notes/

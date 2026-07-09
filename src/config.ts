@@ -15,9 +15,11 @@ if (isDev) {
   // Staging/Preview/Production: use explicit env variable
   apiUrl = viteApiUrl;
 } else if (appEnv === 'staging') {
-  // Staging without API URL: warn and use placeholder
-  console.warn('[DCG Smart Service] WARNING: VITE_API_URL not set in staging mode. Using placeholder.');
-  apiUrl = 'https://script.google.com/macros/s/PLACEHOLDER_STAGING_URL/exec';
+  // Staging without API URL: fail fast to prevent silent production fallback
+  throw new Error(
+    '[DCG Smart Service] FATAL: VITE_API_URL is required in staging mode. ' +
+    'Set it in Vercel Preview environment variables or .env.staging file.'
+  );
 } else {
   // Production fallback
   apiUrl = PRODUCTION_FALLBACK;
