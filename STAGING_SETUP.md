@@ -12,7 +12,7 @@
 1. ไปที่ https://sheets.google.com
 2. กด **Blank** เพื่อสร้าง spreadsheet ใหม่
 3. ตั้งชื่อ: `DCG Smart Service Database (Staging)`
-4. คัดลอก structure จาก production sheet:
+4. คัดลอกโครงสร้างจาก sheet production:
    - Master_Users
    - Master_Departments
    - Master_Services
@@ -41,7 +41,7 @@
 
 7. กด **Save**
 
-### ขั้นที่ 3: Deploy Staging Web App
+### ขั้นที่ 3: ปล่อย Staging Web App
 1. กด **Deploy > New deployment**
 2. เลือก **Web app**
 3. ตั้งค่า:
@@ -75,7 +75,7 @@ clasp push
    - Value: [Staging Web App URL ที่คัดลอกไว้]
    - Environment: **Preview** (เลือกเฉพาะ Preview)
 
-### ขั้นที่ 7: Deploy Preview
+### ขั้นที่ 7: ปล่อย Preview
 ```bash
 git push origin phase-1-3-staging-verification
 ```
@@ -90,7 +90,7 @@ Vercel จะสร้าง Preview deployment โดยอัตโนมั�
 
 ---
 
-## วิธีสลับกลับ Production
+## วิธีสลับกลับระบบจริง
 ```bash
 # ใช้ script อัตโนมัติ
 ./scripts/switch-clasp.sh production
@@ -105,7 +105,7 @@ cp .clasp.production.json .clasp.json
 - [ ] สร้าง Google Sheets staging
 - [ ] สร้าง Apps Script staging
 - [ ] ตั้งค่า Script Properties
-- [ ] Deploy staging web app
+- [ ] ปล่อย staging web app
 - [ ] คัดลอก staging script ID ไปใส่ `.clasp.staging.json`
 - [ ] ตั้งค่า Vercel Preview env `VITE_API_URL`
 - [ ] Push code ไป branch staging

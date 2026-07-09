@@ -1,11 +1,11 @@
-# แผน Staging/Testing และ Production Release Runbook สำหรับ DCG Smart Service
+# แผน Staging/Testing และคู่มือปล่อยระบบ สำหรับ DCG Smart Service
 
 ## ภาพรวม
 สร้าง release runbook เป็นเอกสารหลักของโปรเจกต์ก่อนเริ่ม staging/testing เพื่อให้ทุกครั้งที่ปล่อยระบบมี checklist เดียวกัน ใช้ลดความเสี่ยงกับผู้ใช้จริง และบังคับผ่าน local, staging, schema, rollback และ smoke test ก่อน production
 
 ---
 
-## ขั้นที่ 0: สร้าง Deployment Runbook
+## ขั้นที่ 0: สร้างคู่มือการปล่อยระบบ
 - ไฟล์นี้ `docs/STAGING_RELEASE_PLAN.md` เป็นเอกสารหลักของโปรเจกต์
 - เนื้อหาเป็น checklist ทำตามได้ทีละขั้น ไม่ใช่แค่บทสรุป
 - Phase 3.5 Split Backend ยังไม่ทำในรอบนี้
@@ -18,7 +18,7 @@
 
 ---
 
-## ขั้นที่ A: ตรวจสอบ Local
+## ขั้นที่ A: ตรวจสอบเครื่องทดสอบในเครื่อง
 
 ### A1. รันและบันทึกผล
 ```bash
@@ -51,7 +51,7 @@ npm run test:coverage       # Coverage report-only ยังไม่ enforce th
 - [ ] `Tx_OTPStore` มีคอลัมน์ `SessionTokenHash`
 - [ ] `Tx_SelfServiceOTPStore` มี `SessionTokenHash` ถ้า self-service ใช้งานจริง
 
-### B3. ทดสอบ Backend (Smoke Test)
+### B3. ทดสอบ Backend (ทดสอบเบื้องต้น)
 - [ ] request OTP → verify OTP → login
 - [ ] บันทึกธุรกรรม (run/sort/ext)
 - [ ] ค้นหารายงานแบบ department
@@ -95,7 +95,7 @@ npm run test:e2e
 
 ---
 
-## ขั้นที่ E: ตรวจสอบก่อน Production
+## ขั้นที่ E: ตรวจสอบก่อนปล่อยระบบจริง
 
 ### E1. ตรวจสอบ GAS Rollback
 - [ ] บันทึก `Deployment ID` ปัจจุบันของ production
@@ -121,7 +121,7 @@ npm run test:e2e
 
 ---
 
-## ขั้นที่ F: Production Deploy
+## ขั้นที่ F: ปล่อยระบบจริง
 
 ### F1. Deploy
 - [ ] Deploy GAS production เป็น version ใหม่
@@ -135,7 +135,7 @@ npm run test:e2e
 - [ ] ตรวจ budget_owner search
 - [ ] ตรวจ delete/admin flow
 
-### F3. Rollback ถ้า fail รุนแรง
+### F3. ย้อนกลับเวอร์ชันถ้าล้มเหลวรุนแรง
 - [ ] rollback GAS ไป version เดิม
 - [ ] rollback frontend ไป previous deployment
 - [ ] หยุด token cleanup/migration เพิ่มเติม
@@ -167,11 +167,11 @@ npm run test:e2e
 
 ---
 
-## บันทึก Rollback
+## บันทึกการย้อนกลับเวอร์ชัน
 
 | สถานการณ์ | วิธีแก้ |
 |-----------|--------|
-| Backend bug | Redeploy Apps Script version ก่อนหน้า ผ่าน Manage Deployments |
-| Frontend bug | Revert PR ใน GitHub หรือ rollback Vercel deployment |
-| Data issue | ตรวจสอบ Google Sheets โดยตรง |
-| Schema issue | ย้อนกลับ schema ด้วย schema audit/repair |
+| ปัญหาหลังบ้าน | Redeploy Apps Script version ก่อนหน้า ผ่าน Manage Deployments |
+| ปัญหาหน้าบ้าน | Revert PR ใน GitHub หรือ rollback Vercel deployment |
+| ปัญหาข้อมูล | ตรวจสอบ Google Sheets โดยตรง |
+| ปัญหา schema | ย้อนกลับ schema ด้วย schema audit/repair |
