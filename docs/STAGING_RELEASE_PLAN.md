@@ -1,5 +1,18 @@
 # แผน Staging/Testing และคู่มือปล่อยระบบ สำหรับ DCG Smart Service
 
+## สถานะปัจจุบัน (9 กรกฎาคม 2569)
+
+| Phase | สถานะ | วันที่ผ่าน |
+|-------|--------|------------|
+| Phase A: Local/CI Verification | ✅ PASS | 9 กรกฎาคม 2569 |
+| Phase B: Staging Backend | ✅ PASS | 9 กรกฎาคม 2569 |
+| Phase C: Frontend Preview Staging | ✅ PASS | 9 กรกฎาคม 2569 |
+| Phase D: Manual Smoke Test หลัก | ✅ PASS | 9 กรกฎาคม 2569 |
+| Phase E: Pre-Production Gate | ⏳ ขั้นตอนถัดไป | - |
+| Phase F: Production Deploy | ⏳ รอ Phase E | - |
+
+---
+
 ## ภาพรวม
 สร้างคู่มือปล่อยระบบเป็นเอกสารหลักของโปรเจกต์ก่อนเริ่ม staging/testing เพื่อให้ทุกครั้งที่ปล่อยระบบมีรายการตรวจสอบเดียวกัน ใช้ลดความเสี่ยงกับผู้ใช้จริง และบังคับผ่านเครื่องทดสอบในเครื่อง, staging, schema, ย้อนกลับเวอร์ชัน และทดสอบเบื้องต้น ก่อนปล่อยระบบจริง
 
@@ -18,9 +31,9 @@
 
 ---
 
-## ขั้นที่ A: ตรวจสอบเครื่องทดสอบในเครื่อง
+## ขั้นที่ A: ตรวจสอบเครื่องทดสอบในเครื่อง ✅ PASS (9 กรกฎาคม 2569)
 
-### A1. รันและบันทึกผล
+### A1. รันและบันทึกผล ✅
 ```bash
 npm test                    # ต้องผ่านทั้งหมด
 npm run lint                # ต้องไม่มี error
@@ -29,69 +42,69 @@ npm run build               # การสร้างไฟล์สำหร�
 npm run test:coverage       # รายงาน Coverage ยังไม่ enforce threshold
 ```
 
-### A2. ทดสอบ localhost ด้วยมือ
-- [ ] login/mock flow ต้องใช้ network mock เท่านั้น
-- [ ] บันทึกงาน (run/sort/ext)
-- [ ] รายงาน 1 เดือน/3 เดือน ต้องยอดตรงกัน
-- [ ] ค้นหาแบบ department เดิม (default)
-- [ ] ค้นหาแบบ budget_owner ใหม่
-- [ ] ส่งออก/ลบ ใช้ข้อมูลเต็ม ไม่ใช่เฉพาะ virtualized rows
-- [ ] virtualized list scroll แล้วไม่เลื่อน/ซ้อนกัน
+### A2. ทดสอบ localhost ด้วยมือ ✅
+- [x] login/mock flow ต้องใช้ network mock เท่านั้น
+- [x] บันทึกงาน (run/sort/ext)
+- [x] รายงาน 1 เดือน/3 เดือน ต้องยอดตรงกัน
+- [x] ค้นหาแบบ department เดิม (default)
+- [x] ค้นหาแบบ budget_owner ใหม่
+- [x] ส่งออก/ลบ ใช้ข้อมูลเต็ม ไม่ใช่เฉพาะ virtualized rows
+- [x] virtualized list scroll แล้วไม่เลื่อน/ซ้อนกัน
 
 ---
 
-## ขั้นที่ B: Staging Backend
+## ขั้นที่ B: Staging Backend ✅ PASS (9 กรกฎาคม 2569)
 
-### B1. ตั้งค่า Staging
-- [ ] สร้าง Google Sheets staging แยกจากระบบจริง
-- [ ] ตั้งค่า Apps Script staging ชี้ staging sheet เท่านั้น
-- [ ] `clasp push` ไป staging project/deployment
+### B1. ตั้งค่า Staging ✅
+- [x] สร้าง Google Sheets staging แยกจากระบบจริง
+- [x] ตั้งค่า Apps Script staging ชี้ staging sheet เท่านั้น
+- [x] `clasp push` ไป staging project/deployment
 
-### B2. ตรวจ Schema
-- [ ] `Tx_OTPStore` มีคอลัมน์ `SessionTokenHash`
-- [ ] `Tx_SelfServiceOTPStore` มี `SessionTokenHash` ถ้า self-service ใช้งานจริง
+### B2. ตรวจ Schema ✅
+- [x] `Tx_OTPStore` มีคอลัมน์ `SessionTokenHash`
+- [x] `Tx_SelfServiceOTPStore` มี `SessionTokenHash` ถ้า self-service ใช้งานจริง
 
-### B3. ทดสอบ Backend (ทดสอบเบื้องต้น)
-- [ ] request OTP → verify OTP → login
-- [ ] บันทึกธุรกรรม (run/sort/ext)
-- [ ] ค้นหารายงานแบบ department
-- [ ] ค้นหารายงานแบบ budget_owner
-- [ ] ลบรายการ (deleteLog)
-- [ ] archive/rollover เฉพาะ Admin หรือตรวจ log-only warning
-
----
-
-## ขั้นที่ C: Frontend Staging
-
-### C1. ปล่อยระบบ
-- [ ] ปล่อย frontend preview/staging โดยชี้ API ไป staging backend
-- [ ] ห้ามแก้ URL มือในโค้ด ใช้ env/config เท่านั้น
-
-### C2. ทดสอบ Full Flow
-- [ ] login → บันทึก → sync → รายงาน → ส่งออก
-- [ ] pending/offline logs ทั้ง timestamp เก่าและใหม่
-- [ ] sidebar/progress วันนี้
-- [ ] virtualized list ตอน scroll
-- [ ] default search mode ยังเป็น `department`
+### B3. ทดสอบ Backend (ทดสอบเบื้องต้น) ✅
+- [x] request OTP → verify OTP → login
+- [x] บันทึกธุรกรรม (run/sort/ext)
+- [x] ค้นหารายงานแบบ department
+- [x] ค้นหารายงานแบบ budget_owner
+- [x] ลบรายการ (deleteLog)
+- [x] archive/rollover เฉพาะ Admin หรือตรวจ log-only warning
 
 ---
 
-## ขั้นที่ D: E2E Testing
+## ขั้นที่ C: Frontend Staging ✅ PASS (9 กรกฎาคม 2569)
 
-### D1. รัน E2E
+### C1. ปล่อยระบบ ✅
+- [x] ปล่อย frontend preview/staging โดยชี้ API ไป staging backend
+- [x] ห้ามแก้ URL มือในโค้ด ใช้ env/config เท่านั้น
+
+### C2. ทดสอบ Full Flow ✅
+- [x] login → บันทึก → sync → รายงาน → ส่งออก
+- [x] pending/offline logs ทั้ง timestamp เก่าและใหม่
+- [x] sidebar/progress วันนี้
+- [x] virtualized list ตอน scroll
+- [x] default search mode ยังเป็น `department`
+
+---
+
+## ขั้นที่ D: E2E Testing ✅ PASS (9 กรกฎาคม 2569)
+
+### D1. รัน E2E ✅
 ```bash
 npm run test:e2e
 ```
 
-### D2. ตรวจสอบ Mock Flow
-- [ ] Mock ต้อง intercept ด้วย `page.route()` เท่านั้น ไม่พึ่ง `mock-token-123`
-- [ ] login สำเร็จ/ล้มเหลว
-- [ ] สร้างธุรกรรม
-- [ ] รายงานช่วง 1 เดือน/3 เดือน
-- [ ] ค้นหาแบบ department
-- [ ] ค้นหาแบบ budget_owner
-- [ ] ลบรายการ
-- [ ] ส่งออกรายงานถ้ามี fixture
+### D2. ตรวจสอบ Mock Flow ✅
+- [x] Mock ต้อง intercept ด้วย `page.route()` เท่านั้น ไม่พึ่ง `mock-token-123`
+- [x] login สำเร็จ/ล้มเหลว
+- [x] สร้างธุรกรรม
+- [x] รายงานช่วง 1 เดือน/3 เดือน
+- [x] ค้นหาแบบ department
+- [x] ค้นหาแบบ budget_owner
+- [x] ลบรายการ
+- [x] ส่งออกรายงานถ้ามี fixture
 
 ---
 
