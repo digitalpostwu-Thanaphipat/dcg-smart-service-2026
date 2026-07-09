@@ -5,6 +5,9 @@ node_modules/
 dist/
 dist_old/
 
+# Test coverage
+coverage/
+
 # IDE & Editor
 .vscode/
 .idea/
@@ -33,10 +36,13 @@ npm-debug.log*
 .env
 .env.local
 .env.*.local
+.env.staging
+.env.production
 
 # Scratch / temporary files
 scratch/
-scripts/
+scripts/*
+!scripts/switch-clasp.sh
 
 # Notes (personal — not project docs)
 notes/

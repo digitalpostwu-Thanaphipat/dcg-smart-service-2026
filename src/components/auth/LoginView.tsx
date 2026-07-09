@@ -231,7 +231,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onShowPublic }) =
             onClick={() => setShowDevMode(!showDevMode)}
             className="text-[10px] font-bold text-slate-500 hover:text-slate-400 flex items-center justify-center gap-1.5 mx-auto py-1 px-3 rounded-full hover:bg-white/5 transition-all"
           >
-            <Settings size={12} /> 
+            <Settings size={12} />
             {showDevMode ? 'ซ่อนโหมดนักพัฒนา' : 'โหมดนักพัฒนา (Mock Login)'}
           </button>
 
@@ -251,7 +251,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onShowPublic }) =
                   className="w-full bg-slate-900/60 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:ring-1 focus:ring-purple-500 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-purple-500 focus-visible:outline-none outline-none transition-all"
                 />
               </div>
-              <button 
+              <button
                 type="submit"
                 className="w-full bg-purple-600/30 hover:bg-purple-600 border border-purple-500/30 hover:border-purple-500 text-purple-200 hover:text-white py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 active:scale-95 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-purple-500 focus-visible:outline-none"
               >

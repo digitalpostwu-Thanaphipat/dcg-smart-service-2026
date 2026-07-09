@@ -1,3 +1,5 @@
+export type SearchMode = 'department' | 'budget_owner';
+
 export interface User {
     UserID: string;
     Email: string;
