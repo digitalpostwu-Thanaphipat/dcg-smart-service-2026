@@ -89,22 +89,22 @@ npm run test:coverage       # รายงาน Coverage ยังไม่ enf
 
 ---
 
-## ขั้นที่ D: E2E Testing ✅ PASS (9 กรกฎาคม 2569)
+## ขั้นที่ D: Manual Smoke Test หลัก ✅ PASS (9 กรกฎาคม 2569)
 
-### D1. รัน E2E ✅
+### D1. ทดสอบบน Preview/Staging ✅
+- [x] login สำเร็จ
+- [x] บันทึกธุรกรรม (run/sort/ext) สำเร็จ ข้อมูลเข้า Staging Sheet
+- [x] รายงานอ่านข้อมูลจาก Staging ได้
+- [x] คัดลอกสรุปทำงานและยอดตรง
+- [x] ส่งออก Excel ทำงาน
+- [x] ลบรายการ รายการหายจาก Staging
+- [x] Production Sheet ไม่โดนข้อมูลทดสอบ
+
+### E2E Testing: ยังไม่รัน / optional ก่อน production
 ```bash
 npm run test:e2e
 ```
-
-### D2. ตรวจสอบ Mock Flow ✅
-- [x] Mock ต้อง intercept ด้วย `page.route()` เท่านั้น ไม่พึ่ง `mock-token-123`
-- [x] login สำเร็จ/ล้มเหลว
-- [x] สร้างธุรกรรม
-- [x] รายงานช่วง 1 เดือน/3 เดือน
-- [x] ค้นหาแบบ department
-- [x] ค้นหาแบบ budget_owner
-- [x] ลบรายการ
-- [x] ส่งออกรายงานถ้ามี fixture
+*หมายเหตุ: ยังไม่ได้รัน automated E2E เต็มชุด ต้องรันก่อน production ถ้าต้องการ*
 
 ---
 
