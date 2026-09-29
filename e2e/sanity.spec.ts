@@ -9,9 +9,11 @@ test.describe('DCG Smart Service Complete Sanity Checks & Transaction Workflows'
       ext: [] as any[],
     };
     const makeTimestamp = () => new Date().toISOString().replace('T', ' ').substring(0, 19);
+    const today = new Date();
+    const todayDisplay = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
 
     // Intercept Google Apps Script API calls to run offline/mocked
-    await page.route('**/macros/s/**/exec', async (route) => {
+    await page.route(/(?:\/macros\/s\/.*\/exec|\/api\/exec)$/, async (route) => {
       const request = route.request();
       if (request.method() === 'POST') {
         const postData = JSON.parse(request.postData() || '{}');
@@ -50,6 +52,17 @@ test.describe('DCG Smart Service Complete Sanity Checks & Transaction Workflows'
               }
             })
           });
+        } else if (action === 'getPublicMetaData') {
+          await route.fulfill({
+            contentType: 'application/json',
+            body: JSON.stringify({
+              status: 'success',
+              data: {
+                departments: [{ DeptID: 'D001', DeptName: 'สำนักอำนวยการ', RouteGroup: 'สาย A' }],
+                services: [{ ServiceID: 'S01', ServiceName: 'EMS' }]
+              }
+            })
+          });
         } else if (action === 'publicSearch' || action === 'selfServiceSearch') {
           expect(postData.auth?.selfServiceSessionToken).toBe('SS-MOCKTOKEN123');
           await route.fulfill({
@@ -59,7 +72,7 @@ test.describe('DCG Smart Service Complete Sanity Checks & Transaction Workflows'
               data: {
                 run: [
                   {
-                    date: '09/06/2026',
+                    date: todayDisplay,
                     route: 'สาย A',
                     round: 'รอบเช้า',
                     count: 5,
@@ -87,7 +100,7 @@ test.describe('DCG Smart Service Complete Sanity Checks & Transaction Workflows'
               data: {
                 email: 'viewer@example.com',
                 sessionToken: 'SS-MOCKTOKEN123',
-                sessionExpiresAt: '2026-06-12T16:59:59.999Z'
+                sessionExpiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString()
               }
             })
           });
@@ -181,6 +194,27 @@ test.describe('DCG Smart Service Complete Sanity Checks & Transaction Workflows'
         });
       }
     });
+  });
+
+  test('should make one startup health check and skip protected metadata before login', async ({ page }) => {
+    let connectionChecks = 0;
+    let unauthenticatedMetadataRequests = 0;
+    page.on('request', request => {
+      const isApiRequest = request.url().includes('/macros/s/') || request.url().endsWith('/api/exec');
+      if (!isApiRequest) return;
+      if (request.method() === 'GET') connectionChecks += 1;
+      if (request.method() === 'POST') {
+        const body = JSON.parse(request.postData() || '{}');
+        if (body.action === 'getMetaData' && !body.auth?.sessionToken) {
+          unauthenticatedMetadataRequests += 1;
+        }
+      }
+    });
+
+    await page.goto('/');
+    await expect(page.locator('h1')).toContainText('DCG Smart Service');
+    await expect.poll(() => connectionChecks).toBe(1);
+    expect(unauthenticatedMetadataRequests).toBe(0);
   });
 
   test('should load application, verify brand header, and switch to public mode (ตรวจสอบการใช้บริการของหน่วยงาน)', async ({ page }) => {

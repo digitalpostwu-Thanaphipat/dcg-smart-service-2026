@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAppStore } from './store/useAppStore';
 import { api } from './services/api';
 import { MainLayout } from './components/layout/MainLayout';
@@ -26,6 +26,7 @@ function App() {
   const {
     currentUser,
     setCurrentUser,
+    sessionToken,
     setSessionToken,
     setMasterData,
     loading,
@@ -54,6 +55,7 @@ function App() {
   const [initialPublicDept, setInitialPublicDept] = useState('');
   const [connectionStatus, setConnectionStatus] = useState<'checking' | 'connected' | 'failed'>('checking');
   const [connectionError, setConnectionError] = useState('');
+  const didRunStartupTasks = useRef(false);
 
   // Sync theme mode with document HTML element
   useEffect(() => {
@@ -65,26 +67,6 @@ function App() {
   }, [theme]);
 
   useEffect(() => {
-    // Check connection on startup
-    const checkConnection = async () => {
-      try {
-        const connected = await api.checkConnection();
-        if (connected) {
-          setConnectionStatus('connected');
-          setConnectionError('');
-        } else {
-          setConnectionStatus('failed');
-          setConnectionError('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต');
-        }
-      } catch (err: any) {
-        setConnectionStatus('failed');
-        setConnectionError(err.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อ');
-      }
-    };
-    checkConnection();
-
-    fetchMetaData();
-    
     // Check URL parameters for direct public view linking
     const params = new URLSearchParams(window.location.search);
     const view = params.get('view');
@@ -97,9 +79,15 @@ function App() {
     }
     
     // Verify connection and trigger sync if online
-    const checkNetworkAndSync = async () => {
+    const checkNetworkAndSync = async (updateConnectionBanner = false) => {
       const activeConnection = await api.checkConnection();
       setIsOnline(activeConnection);
+      if (updateConnectionBanner) {
+        setConnectionStatus(activeConnection ? 'connected' : 'failed');
+        setConnectionError(activeConnection
+          ? ''
+          : 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต');
+      }
       if (activeConnection) {
         syncEngine.syncPendingLogs();
       }
@@ -108,7 +96,7 @@ function App() {
     // Register sync triggers
     const handleOnline = () => {
       console.log('App: Browser online status detected.');
-      checkNetworkAndSync();
+      checkNetworkAndSync(true);
     };
     
     const handleOffline = () => {
@@ -119,8 +107,14 @@ function App() {
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
     
-    // Run initial sync on mount
-    checkNetworkAndSync();
+    // React StrictMode runs effects twice in development. Keep startup API calls single-shot.
+    if (!didRunStartupTasks.current) {
+      didRunStartupTasks.current = true;
+      checkNetworkAndSync(true);
+      if (currentUser && sessionToken) {
+        fetchMetaData(sessionToken);
+      }
+    }
     
     // Periodic background validation & sync (every 30 seconds)
     const intervalId = setInterval(checkNetworkAndSync, 30000);
