@@ -286,3 +286,27 @@ describe('api self-service endpoints', () => {
         });
     });
 });
+
+describe('api.checkConnection', () => {
+    beforeEach(() => {
+        vi.useFakeTimers();
+        vi.stubGlobal('fetch', vi.fn());
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+        vi.restoreAllMocks();
+    });
+
+    it('retries once when the Apps Script health check fails transiently', async () => {
+        vi.mocked(fetch)
+            .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+            .mockResolvedValueOnce({ ok: true } as Response);
+
+        const connectionResult = api.checkConnection();
+        await vi.runAllTimersAsync();
+
+        await expect(connectionResult).resolves.toBe(true);
+        expect(fetch).toHaveBeenCalledTimes(2);
+    });
+});

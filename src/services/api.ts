@@ -3,6 +3,8 @@ import { useAppStore } from '../store/useAppStore';
 import { SelfServiceLogPayload } from '../utils/selfService';
 
 const JSON_HEADERS = { 'Content-Type': 'text/plain' };
+const CONNECTION_TIMEOUT_MS = 8000;
+const CONNECTION_RETRY_DELAY_MS = 250;
 
 // ดึง Token จาก Zustand Store อย่างปลอดภัย (แก้ปัญหา Session Desync)
 // รองรับ Fallback ดึงจาก sessionStorage เพื่อรักษาความเข้ากันได้กับชุดการทดสอบเดิม (Unit Tests)
@@ -234,15 +236,23 @@ export const api = {
     },
 
     checkConnection: async () => {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 4000);
-        try {
-            const res = await fetch(API_URL, { method: 'GET', signal: controller.signal });
-            clearTimeout(timeoutId);
-            return res.ok;
-        } catch (e) {
-            clearTimeout(timeoutId);
-            return false;
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), CONNECTION_TIMEOUT_MS);
+            try {
+                const res = await fetch(API_URL, { method: 'GET', signal: controller.signal });
+                if (res.ok) return true;
+            } catch {
+                // Apps Script can fail transiently while redirecting to googleusercontent.com.
+            } finally {
+                clearTimeout(timeoutId);
+            }
+
+            if (attempt === 0) {
+                await new Promise(resolve => setTimeout(resolve, CONNECTION_RETRY_DELAY_MS));
+            }
         }
+
+        return false;
     }
 };
