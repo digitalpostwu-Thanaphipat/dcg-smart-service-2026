@@ -8,6 +8,7 @@ import { useAppStore } from '../store/useAppStore';
 import { LogItem } from '../types';
 import { toast } from 'sonner';
 import { generateTxId } from './txId';
+import { formatLocalDateTime } from '../utils/helpers';
 
 const isAuthError = (err: any) => {
   const errMsg = String(err?.message || err || '');
@@ -113,7 +114,7 @@ export const syncEngine = {
 
     const now = new Date();
     const txId = generateTxId(type, now);
-    const timestampStr = now.toISOString().replace('T', ' ').substring(0, 19);
+    const timestampStr = formatLocalDateTime(now);
 
     let desc = '';
     let count = 0;

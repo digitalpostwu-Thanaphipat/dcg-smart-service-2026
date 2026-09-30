@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { User, Department, Service, LogItem } from '../types';
+import { User, Department, Service, LogItem, SearchMode } from '../types';
+import { formatLocalDate } from '../utils/helpers';
 
 interface AppState {
   // --- Auth & User ---
@@ -46,6 +47,7 @@ interface AppState {
     endDate: string;
     dept: string;
     type: string;
+    searchMode: SearchMode;
   };
   setFilters: (filters: any) => void;
 }
@@ -99,10 +101,11 @@ export const useAppStore = create<AppState>()(
       
       filters: {
         dateMode: 'today',
-        startDate: new Date().toISOString().split('T')[0],
-        endDate: new Date().toISOString().split('T')[0],
+        startDate: formatLocalDate(new Date()),
+        endDate: formatLocalDate(new Date()),
         dept: '',
-        type: 'all'
+        type: 'all',
+        searchMode: 'department'
       },
       setFilters: (filters) => set((state) => ({ filters: { ...state.filters, ...filters } })),
     }),

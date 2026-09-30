@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - 'phase-*'
   pull_request:
     branches:
       - main
@@ -37,3 +38,6 @@ jobs:
 
       - name: Build Project
         run: npm run build
+
+      - name: Run Coverage
+        run: npm run test:coverage

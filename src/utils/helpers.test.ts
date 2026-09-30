@@ -6,6 +6,9 @@ import {
     getDeptDisplay,
     getDeptLocationDisplay,
     getRealOwner,
+    normalizeDeptName,
+    formatLocalDateTime,
+    formatLocalDate,
 } from './helpers';
 import { Department } from '../types';
 
@@ -63,6 +66,14 @@ describe('helpers.ts utilities', () => {
         it('should return input name if departments list is undefined', () => {
             expect(getRealOwner('ศูนย์คอมพิวเตอร์', undefined)).toBe('ศูนย์คอมพิวเตอร์');
         });
+
+        it('should match department with trailing space', () => {
+            expect(getRealOwner('ศูนย์คอมพิวเตอร์ ', mockDepts)).toBe('ส่วนบริการการศึกษา');
+        });
+
+        it('should match department with different case', () => {
+            expect(getRealOwner('ศูนย์คอมพิวเตอร์', mockDepts)).toBe('ส่วนบริการการศึกษา');
+        });
     });
 
     describe('department metadata helpers', () => {
@@ -93,6 +104,54 @@ describe('helpers.ts utilities', () => {
             expect(departmentMatchesSearch(dept, 'ชั้น 3')).toBe(true);
             expect(departmentMatchesSearch(dept, 'สำนักแม่')).toBe(true);
             expect(departmentMatchesSearch(dept, 'ไม่พบคำนี้')).toBe(false);
+        });
+    });
+
+    describe('normalizeDeptName', () => {
+        it('should trim whitespace', () => {
+            expect(normalizeDeptName('  ศูนย์คอมพิวเตอร์  ')).toBe('ศูนย์คอมพิวเตอร์');
+        });
+
+        it('should convert to lowercase', () => {
+            expect(normalizeDeptName('ศูนย์คอมพิวเตอร์')).toBe('ศูนย์คอมพิวเตอร์');
+        });
+
+        it('should trim and lowercase together', () => {
+            expect(normalizeDeptName('  ส่วนอำนวยการ  ')).toBe('ส่วนอำนวยการ');
+        });
+    });
+
+    describe('formatLocalDateTime', () => {
+        it('should format date in local time', () => {
+            const date = new Date(2026, 5, 15, 14, 30, 45); // June 15, 2026 14:30:45
+            expect(formatLocalDateTime(date)).toBe('2026-06-15 14:30:45');
+        });
+
+        it('should pad single digits with zeros', () => {
+            const date = new Date(2026, 0, 5, 8, 5, 3); // Jan 5, 2026 08:05:03
+            expect(formatLocalDateTime(date)).toBe('2026-01-05 08:05:03');
+        });
+
+        it('should handle midnight (00:00:00)', () => {
+            const date = new Date(2026, 6, 1, 0, 0, 0); // July 1, 2026 00:00:00
+            expect(formatLocalDateTime(date)).toBe('2026-07-01 00:00:00');
+        });
+
+        it('should handle 06:59 AM (edge case for timezone)', () => {
+            const date = new Date(2026, 6, 1, 6, 59, 0); // July 1, 2026 06:59:00
+            expect(formatLocalDateTime(date)).toBe('2026-07-01 06:59:00');
+        });
+    });
+
+    describe('formatLocalDate', () => {
+        it('should format date in local time', () => {
+            const date = new Date(2026, 5, 15); // June 15, 2026
+            expect(formatLocalDate(date)).toBe('2026-06-15');
+        });
+
+        it('should pad single digits with zeros', () => {
+            const date = new Date(2026, 0, 5); // Jan 5, 2026
+            expect(formatLocalDate(date)).toBe('2026-01-05');
         });
     });
 

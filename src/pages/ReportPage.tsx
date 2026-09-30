@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { api } from '../services/api';
 import { GlassCard } from '../components/shared/GlassCard';
@@ -9,7 +9,7 @@ import {
   FileSpreadsheet, Calculator
 } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { getRealOwner, getDateRange } from '../utils/helpers';
+import { getRealOwner, getDateRange, formatLocalDateTime, normalizeDeptName } from '../utils/helpers';
 import { LogItem } from '../types';
 import { getNonSyncedLogs, deleteLogLocal } from '../lib/db';
 import { ReportFilters } from '../components/reports/ReportFilters';
@@ -20,6 +20,7 @@ import { BudgetReport } from '../components/reports/BudgetReport';
 import { RUN_SAVING_PER_UNIT } from '../lib/constants';
 import { normalizeFundSource } from '../utils/fundSource';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import * as XLSX from 'xlsx';
 
 type ReportTab = 'list' | 'run' | 'sort' | 'ext' | 'budget';
@@ -152,7 +153,7 @@ export const ReportPage: React.FC = () => {
             fund = first.fundSource;
           }
 
-          const dateStr = new Date(timestamp).toISOString().replace('T', ' ').substring(0, 19);
+          const dateStr = formatLocalDateTime(new Date(timestamp));
 
           return {
             id: log.id,
@@ -176,13 +177,29 @@ export const ReportPage: React.FC = () => {
         console.error('ไม่สามารถโหลดข้อมูลจาก IndexedDB:', dbError);
       }
 
-      // 3. กรองข้อมูลในเครื่องตามวันที่
+      // 3. กรองข้อมูลในเครื่องตามวันที่และ searchMode
       const filteredLocalList = localList.filter((item) => {
         if (filters.type !== 'all' && item.type !== filters.type) return false;
         const itemDate = item.timestamp.split(' ')[0];
         if (dateRange.start && itemDate < dateRange.start) return false;
         if (dateRange.end && itemDate > dateRange.end) return false;
-        if (filters.dept && !item.dept.toLowerCase().includes(filters.dept.toLowerCase())) return false;
+
+        // กรองตาม dept ตาม searchMode
+        if (filters.dept) {
+          const searchDept = normalizeDeptName(filters.dept);
+          if (filters.searchMode === 'budget_owner') {
+            // budget_owner mode: หาหน่วยงานย่อยที่ BudgetOwner contains คำค้นหา (เหมือน backend)
+            const matchedDepts = masterData?.departments
+              ?.filter(d => normalizeDeptName(d.BudgetOwner || '').includes(searchDept))
+              .map(d => normalizeDeptName(d.DeptName)) || [];
+            matchedDepts.push(searchDept); // รวมหน่วยงานแม่ด้วย
+            const itemDept = normalizeDeptName(item.dept);
+            if (!matchedDepts.includes(itemDept)) return false;
+          } else {
+            // department mode: contains match (เดิม)
+            if (!item.dept.toLowerCase().includes(filters.dept.toLowerCase())) return false;
+          }
+        }
         return true;
       });
 
@@ -549,9 +566,95 @@ export const ReportPage: React.FC = () => {
         aria-labelledby={`report-tab-${reportTab}`}
       >
         {reportTab === 'list' && (
-          <div className="space-y-3">
-            {logs.map((log, index) => (
-              <GlassCard key={`${log.id}-${index}`} className="hover:border-white/20 transition-all">
+          <VirtualizedLogList logs={logs} onDelete={setDeleteTarget} />
+        )}
+
+        {reportTab === 'run' && <RunReport logs={logs} />}
+        {reportTab === 'sort' && <SortReport logs={logs} />}
+        {reportTab === 'ext' && <ExtReport logs={logs} />}
+        {reportTab === 'budget' && <BudgetReport logs={logs} />}
+      </div>
+
+      {/* Confirm Delete Dialog */}
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onConfirm={() => {
+          if (deleteTarget) {
+            handleDelete(deleteTarget.id, deleteTarget.type);
+          }
+          setDeleteTarget(null);
+        }}
+        onCancel={() => setDeleteTarget(null)}
+        title="ยืนยันการลบรายการ"
+        description={`คุณแน่ใจหรือไม่ว่าต้องการลบรายการ${deleteTarget?.dept ? ` ของ "${deleteTarget.dept}"` : 'นี้'}? การดำเนินการนี้ไม่สามารถย้อนกลับได้`}
+        confirmLabel="ลบรายการ"
+        cancelLabel="ยกเลิก"
+        variant="danger"
+      />
+    </div>
+  );
+};
+
+// ───────────── Virtualized Log List ─────────────
+
+interface VirtualizedLogListProps {
+  logs: LogItem[];
+  onDelete: (target: { id: string; type: string; dept: string }) => void;
+}
+
+const VirtualizedLogList: React.FC<VirtualizedLogListProps> = ({ logs, onDelete }) => {
+  const parentRef = useRef<HTMLDivElement>(null);
+
+  const virtualizer = useVirtualizer({
+    count: logs.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 80,
+    overscan: 5,
+    measureElement: (element) => element?.getBoundingClientRect().height ?? 80,
+  });
+
+  if (logs.length === 0) {
+    return (
+      <div className="py-20 text-center space-y-4" role="status">
+        <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mx-auto border border-white/5">
+          <Search size={24} className="text-slate-600" aria-hidden="true" />
+        </div>
+        <p className="text-slate-500 text-sm font-medium">
+          ไม่พบข้อมูลในช่วงเวลาที่เลือก
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      ref={parentRef}
+      className="space-y-3 max-h-[600px] overflow-auto pr-2"
+    >
+      <div
+        style={{
+          height: `${virtualizer.getTotalSize()}px`,
+          width: '100%',
+          position: 'relative',
+        }}
+      >
+        {virtualizer.getVirtualItems().map((virtualRow) => {
+          const log = logs[virtualRow.index];
+          return (
+            <div
+              key={virtualRow.key}
+              ref={virtualizer.measureElement}
+              data-index={virtualRow.index}
+              className="pb-3"
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                transform: `translateY(${virtualRow.start}px)`,
+              }}
+            >
+              <GlassCard className="hover:border-white/20 transition-all">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     <div
@@ -604,7 +707,7 @@ export const ReportPage: React.FC = () => {
                       <span className="text-[8px] text-slate-600 dark:text-slate-400 block">ชิ้น</span>
                     </div>
                     <button
-                      onClick={() => setDeleteTarget({ id: log.id, type: log.type, dept: log.dept })}
+                      onClick={() => onDelete({ id: log.id, type: log.type, dept: log.dept })}
                       className="p-2 text-slate-400 hover:text-rose-600 dark:text-slate-500 dark:hover:text-rose-400 transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-purple-500 dark:focus-visible:ring-orange-500 focus-visible:outline-none rounded-lg"
                       aria-label={`ลบรายการ ${log.dept}`}
                     >
@@ -613,42 +716,10 @@ export const ReportPage: React.FC = () => {
                   </div>
                 </div>
               </GlassCard>
-            ))}
-            {logs.length === 0 && (
-              <div className="py-20 text-center space-y-4" role="status">
-                <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mx-auto border border-white/5">
-                  <Search size={24} className="text-slate-600" aria-hidden="true" />
-                </div>
-                <p className="text-slate-500 text-sm font-medium">
-                  ไม่พบข้อมูลในช่วงเวลาที่เลือก
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {reportTab === 'run' && <RunReport logs={logs} />}
-        {reportTab === 'sort' && <SortReport logs={logs} />}
-        {reportTab === 'ext' && <ExtReport logs={logs} />}
-        {reportTab === 'budget' && <BudgetReport logs={logs} />}
+            </div>
+          );
+        })}
       </div>
-
-      {/* Confirm Delete Dialog */}
-      <ConfirmDialog
-        open={deleteTarget !== null}
-        onConfirm={() => {
-          if (deleteTarget) {
-            handleDelete(deleteTarget.id, deleteTarget.type);
-          }
-          setDeleteTarget(null);
-        }}
-        onCancel={() => setDeleteTarget(null)}
-        title="ยืนยันการลบรายการ"
-        description={`คุณแน่ใจหรือไม่ว่าต้องการลบรายการ${deleteTarget?.dept ? ` ของ "${deleteTarget.dept}"` : 'นี้'}? การดำเนินการนี้ไม่สามารถย้อนกลับได้`}
-        confirmLabel="ลบรายการ"
-        cancelLabel="ยกเลิก"
-        variant="danger"
-      />
     </div>
   );
 };
