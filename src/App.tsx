@@ -7,7 +7,7 @@ import { SortPage } from './pages/SortPage';
 import { ExternalPage } from './pages/ExternalPage';
 import { ReportPage } from './pages/ReportPage';
 import { Loader2, Sun, Moon, WifiOff } from 'lucide-react';
-import { APP_NAME, API_URL } from './config';
+import { APP_NAME } from './config';
 import { LoginView } from './components/auth/LoginView';
 import { PublicTrackView } from './components/auth/PublicTrackView';
 import { getMasterData as getLocalMasterData, setMasterData as setLocalMasterData } from './lib/db';
@@ -38,6 +38,7 @@ function App() {
     setStatus,
     theme,
     setTheme,
+    isOnline,
     setIsOnline
   } = useAppStore();
 
@@ -53,8 +54,6 @@ function App() {
 
   const [showPublicTrack, setShowPublicTrack] = useState(false);
   const [initialPublicDept, setInitialPublicDept] = useState('');
-  const [connectionStatus, setConnectionStatus] = useState<'checking' | 'connected' | 'failed'>('checking');
-  const [connectionError, setConnectionError] = useState('');
   const didRunStartupTasks = useRef(false);
 
   // Sync theme mode with document HTML element
@@ -78,25 +77,20 @@ function App() {
       }
     }
     
-    // Verify connection and trigger sync if online
-    const checkNetworkAndSync = async (updateConnectionBanner = false) => {
-      const activeConnection = await api.checkConnection();
-      setIsOnline(activeConnection);
-      if (updateConnectionBanner) {
-        setConnectionStatus(activeConnection ? 'connected' : 'failed');
-        setConnectionError(activeConnection
-          ? ''
-          : 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต');
-      }
-      if (activeConnection) {
-        syncEngine.syncPendingLogs();
+    // Browser connectivity controls the offline queue. Apps Script GET redirects can
+    // fail even while authenticated POST requests are working.
+    const syncWhenOnline = () => {
+      const browserOnline = navigator.onLine;
+      setIsOnline(browserOnline);
+      if (browserOnline && useAppStore.getState().sessionToken) {
+        void syncEngine.syncPendingLogs();
       }
     };
     
     // Register sync triggers
     const handleOnline = () => {
       console.log('App: Browser online status detected.');
-      checkNetworkAndSync(true);
+      syncWhenOnline();
     };
     
     const handleOffline = () => {
@@ -110,14 +104,14 @@ function App() {
     // React StrictMode runs effects twice in development. Keep startup API calls single-shot.
     if (!didRunStartupTasks.current) {
       didRunStartupTasks.current = true;
-      checkNetworkAndSync(true);
+      syncWhenOnline();
       if (currentUser && sessionToken) {
         fetchMetaData(sessionToken);
       }
     }
     
-    // Periodic background validation & sync (every 30 seconds)
-    const intervalId = setInterval(checkNetworkAndSync, 30000);
+    // Retry pending logs while the browser has network connectivity.
+    const intervalId = setInterval(syncWhenOnline, 30000);
     
     return () => {
       window.removeEventListener('online', handleOnline);
@@ -258,34 +252,13 @@ function App() {
           {sysConfig.appSubtitle || 'ระบบบันทึกข้อมูลการให้บริการงานไปรษณีย์ ส่วนอำนวยการสารบรรณ'}
         </p>
 
-        {/* Connection Diagnostic */}
-        {connectionStatus === 'checking' && (
-          <div className="mb-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-2xl">
-            <div className="flex items-center justify-center gap-2 text-blue-300 text-xs">
-              <Loader2 className="animate-spin w-4 h-4" />
-              <span>กำลังตรวจสอบการเชื่อมต่อ...</span>
-            </div>
-          </div>
-        )}
-
-        {connectionStatus === 'failed' && (
+        {!isOnline && (
           <div className="mb-6 p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-left">
             <div className="flex items-center gap-2 text-rose-300 text-xs font-bold mb-2">
               <WifiOff size={14} />
-              <span>ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้</span>
+              <span>อุปกรณ์ออฟไลน์</span>
             </div>
-            <p className="text-rose-200/70 text-[10px] mb-3">{connectionError}</p>
-            <div className="bg-slate-950/40 rounded-xl p-3 text-[9px] text-slate-400 space-y-1">
-              <p><span className="text-slate-500">API URL:</span> {API_URL.substring(0, 60)}...</p>
-              <p><span className="text-slate-500">สถานะ:</span> CORS หรือ Network Error</p>
-              <p className="text-slate-500 mt-2">ตรวจสอบว่า Google Apps Script Backend ถูก Deploy แล้วหรือยัง</p>
-            </div>
-            <button 
-              onClick={() => window.location.reload()}
-              className="mt-3 w-full py-2 bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/30 text-rose-200 text-[10px] font-bold rounded-xl transition-all"
-            >
-              ลองใหม่
-            </button>
+            <p className="text-rose-200/70 text-[10px]">เชื่อมต่ออินเทอร์เน็ตอีกครั้ง ระบบจะซิงค์รายการที่ค้างไว้ให้อัตโนมัติ</p>
           </div>
         )}
 

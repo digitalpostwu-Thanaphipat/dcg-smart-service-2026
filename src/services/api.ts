@@ -3,8 +3,6 @@ import { useAppStore } from '../store/useAppStore';
 import { SelfServiceLogPayload } from '../utils/selfService';
 
 const JSON_HEADERS = { 'Content-Type': 'text/plain' };
-const CONNECTION_TIMEOUT_MS = 8000;
-const CONNECTION_RETRY_DELAY_MS = 250;
 
 // ดึง Token จาก Zustand Store อย่างปลอดภัย (แก้ปัญหา Session Desync)
 // รองรับ Fallback ดึงจาก sessionStorage เพื่อรักษาความเข้ากันได้กับชุดการทดสอบเดิม (Unit Tests)
@@ -27,10 +25,11 @@ const handleJsonResponse = async (res: Response) => {
     try {
         return JSON.parse(text);
     } catch (e) {
-        console.warn('API returned non-JSON response:', text);
+        console.warn('API returned non-JSON response (HTTP status):', res.status);
         return { 
             status: 'error', 
-            message: text.trim() || 'เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์ (Invalid JSON)' 
+            message: text.trim() || 'เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์ (Invalid JSON)',
+            invalidJson: true
         };
     }
 };
@@ -177,6 +176,9 @@ export const api = {
             body: JSON.stringify({ action: 'saveBatch', payload, auth: getAuthPayload() }) 
         });
         const json = await handleJsonResponse(res);
+        if (json.invalidJson) {
+            throw new TypeError('NetworkError: invalid response from server');
+        }
         if (json.status === 'error') {
             throw new Error(json.message || 'บันทึกข้อมูลล้มเหลว');
         }
@@ -233,26 +235,5 @@ export const api = {
             throw new Error(json.message || 'บันทึกข้อเสนอแนะล้มเหลว');
         }
         return json;
-    },
-
-    checkConnection: async () => {
-        for (let attempt = 0; attempt < 2; attempt += 1) {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), CONNECTION_TIMEOUT_MS);
-            try {
-                const res = await fetch(API_URL, { method: 'GET', signal: controller.signal });
-                if (res.ok) return true;
-            } catch {
-                // Apps Script can fail transiently while redirecting to googleusercontent.com.
-            } finally {
-                clearTimeout(timeoutId);
-            }
-
-            if (attempt === 0) {
-                await new Promise(resolve => setTimeout(resolve, CONNECTION_RETRY_DELAY_MS));
-            }
-        }
-
-        return false;
     }
 };

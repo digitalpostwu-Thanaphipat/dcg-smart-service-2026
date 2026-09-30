@@ -196,9 +196,16 @@ test.describe('DCG Smart Service Complete Sanity Checks & Transaction Workflows'
     });
   });
 
-  test('should make one startup health check and skip protected metadata before login', async ({ page }) => {
+  test('should keep login usable when the legacy GET probe fails', async ({ page }) => {
     let connectionChecks = 0;
     let unauthenticatedMetadataRequests = 0;
+    await page.route(/(?:\/macros\/s\/.*\/exec|\/api\/exec)$/, async route => {
+      if (route.request().method() === 'GET') {
+        await route.fulfill({ status: 404, body: 'Transient redirect failure' });
+      } else {
+        await route.fallback();
+      }
+    });
     page.on('request', request => {
       const isApiRequest = request.url().includes('/macros/s/') || request.url().endsWith('/api/exec');
       if (!isApiRequest) return;
@@ -213,8 +220,21 @@ test.describe('DCG Smart Service Complete Sanity Checks & Transaction Workflows'
 
     await page.goto('/');
     await expect(page.locator('h1')).toContainText('DCG Smart Service');
-    await expect.poll(() => connectionChecks).toBe(1);
+    await page.waitForTimeout(1000);
+    expect(connectionChecks).toBe(0);
+    await expect(page.getByText('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', { exact: true })).toHaveCount(0);
     expect(unauthenticatedMetadataRequests).toBe(0);
+    await page.fill('input[type="email"]', 'admin@wu.ac.th');
+    await page.click('button:has-text("ขอรหัสผ่านใช้ครั้งเดียว (OTP)")');
+    await expect(page.getByText('รหัสยืนยันตัวตน (OTP)')).toBeVisible();
+  });
+
+  test('should show offline guidance only while the browser is offline', async ({ page, context }) => {
+    await page.goto('/');
+    await context.setOffline(true);
+    await expect(page.getByText('อุปกรณ์ออฟไลน์')).toBeVisible();
+    await context.setOffline(false);
+    await expect(page.getByText('อุปกรณ์ออฟไลน์')).toHaveCount(0);
   });
 
   test('should load application, verify brand header, and switch to public mode (ตรวจสอบการใช้บริการของหน่วยงาน)', async ({ page }) => {
