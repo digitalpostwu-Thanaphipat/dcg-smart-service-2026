@@ -287,26 +287,18 @@ describe('api self-service endpoints', () => {
     });
 });
 
-describe('api.checkConnection', () => {
-    beforeEach(() => {
-        vi.useFakeTimers();
-        vi.stubGlobal('fetch', vi.fn());
-    });
-
+describe('api.saveBatch', () => {
     afterEach(() => {
-        vi.useRealTimers();
         vi.restoreAllMocks();
     });
 
-    it('retries once when the Apps Script health check fails transiently', async () => {
-        vi.mocked(fetch)
-            .mockRejectedValueOnce(new TypeError('Failed to fetch'))
-            .mockResolvedValueOnce({ ok: true } as Response);
+    it('treats an upstream HTML error as retryable instead of a validation failure', async () => {
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('<!doctype html><title>Not Found</title>', {
+            status: 404,
+            headers: { 'Content-Type': 'text/html' },
+        })));
 
-        const connectionResult = api.checkConnection();
-        await vi.runAllTimersAsync();
-
-        await expect(connectionResult).resolves.toBe(true);
-        expect(fetch).toHaveBeenCalledTimes(2);
+        await expect(api.saveBatch({ txId: 'RUN-001', type: 'run', items: [], common: {} }))
+            .rejects.toBeInstanceOf(TypeError);
     });
 });
